@@ -22,6 +22,7 @@ export interface State {
 	round: number;
 	generated_at: string;
 	interval_ms: number;
+	timeout_ms: number;
 	cluster: { configured: number; observed: number; max_slot: number | null; leading: number[] };
 	nodes: NodeState[];
 }

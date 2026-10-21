@@ -2,11 +2,15 @@ import { signal } from '@preact/signals';
 import { connection, now, receivedAt, stale, state } from './api';
 import { age } from './ui';
 import { Cluster, Events, Overview } from './screens';
+import { Configuration, Durability, NotExposed } from './more';
 
 const routes = {
 	'': { title: 'Overview', view: Overview },
 	cluster: { title: 'Cluster & Leader', view: Cluster },
+	durability: { title: 'Replication & Durability', view: Durability },
 	events: { title: 'Events', view: Events },
+	config: { title: 'Configuration', view: Configuration },
+	'not-exposed': { title: 'Not exposed by the core', view: NotExposed },
 } as const;
 type Route = keyof typeof routes;
 

@@ -51,6 +51,7 @@ none of them is a health verdict.
   "round": 1801,
   "generated_at": "2026-10-21T12:00:02.010Z",
   "interval_ms": 2000,
+  "timeout_ms": 1000,
   "cluster": {
     "configured": 3,
     "observed": 2,
@@ -134,6 +135,7 @@ none of them is a health verdict.
 | `round` | integer | Poll rounds completed in this epoch. Increases by one per state. |
 | `generated_at` | RFC 3339 UTC | When the round closed, by the console's clock. |
 | `interval_ms` | integer | The configured poll interval. A consumer that gets no new state for two intervals should show the whole view as not current. |
+| `timeout_ms` | integer | How long the console waits for each node's answer in a round: min(1 s, interval / 2). |
 | `nodes` | array | One entry per configured node, in configuration order. |
 | `nodes[].id` | integer | The id given in the console's configuration (`--node` or `STRAUM_CONSOLE_NODES`). |
 | `nodes[].address` | string | The `host:port` the values came from, as configured. |
