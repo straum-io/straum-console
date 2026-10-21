@@ -1,0 +1,22 @@
+{
+  "name": "straum-console-web",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && node build.mjs",
+    "watch": "node build.mjs --watch",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@preact/signals": "2.11.3",
+    "preact": "11.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}

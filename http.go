@@ -33,8 +33,8 @@ func loopbackHost(hostport string) bool {
 
 const writeTimeout = 10 * time.Second
 
-// routes serves /api/v1 of docs/state-json.md. A method pattern makes the
-// mux answer 405 to anything but GET and HEAD.
+// routes serves /api/v1 of docs/state-json.md and the frontend at /. A
+// method pattern makes the mux answer 405 to anything but GET and HEAD.
 func routes(h *hub) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +79,7 @@ func routes(h *hub) http.Handler {
 		json.NewEncoder(w).Encode(map[string][]event{"events": evs})
 	})
 	mux.HandleFunc("GET /api/v1/stream", func(w http.ResponseWriter, r *http.Request) { stream(w, r, h) })
+	mux.Handle("GET /", static())
 	return headers(mux)
 }
 
