@@ -2,6 +2,7 @@
 // from and how old it is; nothing here draws a health verdict.
 import type { ComponentChildren } from 'preact';
 import { ageMs, type ConsoleEvent, type Entry, type Metrics, type NodeState } from './api';
+import { query, setQuery } from './search';
 
 export function age(ms: number): string {
 	if (ms < 1000) return `${Math.max(0, Math.round(ms))} ms`;
@@ -19,6 +20,19 @@ export function clock(iso: string): string {
 		fractionalSecondDigits: 3,
 		hour12: false,
 	});
+}
+
+/** "n of N shown" while a filter is on, with a way to clear it. */
+export function Filtered({ shown, total, what }: { shown: number; total: number; what: string }) {
+	if (!query.value.trim()) return null;
+	return (
+		<p class="filtered" role="status">
+			{shown} of {total} {what} match “{query.value.trim()}” ·{' '}
+			<button type="button" class="link" onClick={() => setQuery('')}>
+				show all
+			</button>
+		</p>
+	);
 }
 
 export function Fact({ value, label }: { value: ComponentChildren; label: string }) {
@@ -130,7 +144,12 @@ export function describe(e: ConsoleEvent): string {
 }
 
 export function EventRows({ list }: { list: Entry[] }) {
-	if (list.length === 0) return <p class="none">No events yet: nothing has changed between two rounds.</p>;
+	if (list.every((x) => x.kind === 'gap') && (query.value.trim() || list.length === 0))
+		return (
+			<p class="none">
+				{query.value.trim() ? 'No event matches the filter.' : 'No events yet: nothing has changed between two rounds.'}
+			</p>
+		);
 	return (
 		<table class="events">
 			<tbody>

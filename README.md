@@ -64,8 +64,9 @@ where the nodes set `STRAUM_CLUSTER_UNAUTHENTICATED_NETWORK=1`, on the
 broker's own terms.
 
 The console polls every 2 s (`--interval`) and serves on `127.0.0.1:8080`
-(`--listen`, loopback only): open http://localhost:8080. The same data is
-JSON:
+(`--listen`, loopback only): open http://localhost:8080. Press `?` for the
+keys: `1`–`6` for the pages, `/` to filter what a page lists. The same data
+is JSON:
 
 ```sh
 curl -s localhost:8080/api/v1/state      # every node, as last read

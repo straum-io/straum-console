@@ -262,3 +262,86 @@ test('after a 10 s network cut, the events missed are replayed, not lost', async
 		net.close();
 	}
 });
+
+test('hotkeys: numbers open pages, ? lists the keys, t switches the theme', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('2');
+	await expect(page.locator('h1')).toHaveText('Cluster & Leader');
+	await page.keyboard.press('6');
+	await expect(page.locator('h1')).toHaveText('Not exposed by the core');
+	await page.keyboard.press('1');
+	await expect(page.locator('h1')).toHaveText('Overview');
+
+	await page.keyboard.press('?');
+	await expect(page.locator('dialog#keys')).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(page.locator('dialog#keys')).toBeHidden();
+
+	const before = await page.evaluate(() => document.documentElement.dataset['theme']);
+	await page.keyboard.press('t');
+	await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme'])).not.toBe(before);
+	await page.keyboard.press('t');
+});
+
+test('search filters what each page lists, lives in the URL, and keys do not fire while typing', async ({ page }) => {
+	await open(page);
+	// Keys typed into the field are text, never page keys or the theme key.
+	const theme = await page.evaluate(() => document.documentElement.dataset['theme']);
+	await page.keyboard.press('/');
+	await expect(page.locator('#search')).toBeFocused();
+	await page.keyboard.type('2t');
+	await expect(page.locator('h1')).toHaveText('Overview');
+	expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe(theme);
+	await expect(page.locator('#search')).toHaveValue('2t');
+	await page.locator('#search').fill('');
+	await page.locator('#search').blur();
+	// With a modifier, a digit is the browser's, not the console's.
+	await page.keyboard.press('Control+2');
+	await page.keyboard.press('Alt+2');
+	await expect(page.locator('h1')).toHaveText('Overview');
+	// While the help is open, page keys do nothing.
+	await page.keyboard.press('?');
+	await page.keyboard.press('3');
+	await expect(page.locator('h1')).toHaveText('Overview');
+	await page.keyboard.press('Escape');
+
+	await page.keyboard.press('/');
+	await page.keyboard.type('node 1');
+	await expect(page.locator('.card')).toHaveCount(1);
+	await expect(page.locator('.card')).toHaveAttribute('data-node', '1');
+	await expect(page.locator('.filtered')).toContainText('1 of 3 nodes');
+	expect(page.url()).toContain('q=node+1');
+
+	// The filter follows to other pages.
+	await page.getByRole('link', { name: /Cluster & Leader/ }).click();
+	await expect(page.locator('table.grid tbody tr')).toHaveCount(1);
+
+	// Esc in the box clears it.
+	await page.locator('#search').focus();
+	await page.keyboard.press('Escape');
+	await expect(page.locator('table.grid tbody tr')).toHaveCount(3);
+
+	// A node that stops answering is found by its state.
+	nodes[2]!.down = true;
+	await page.goto(`${base}/#/?q=unknown`);
+	await expect(page.locator('.card')).toHaveCount(1, { timeout: 5000 });
+	await expect(page.locator('.card')).toHaveAttribute('data-node', '2');
+	nodes[2]!.down = false;
+});
+
+test('search finds events by name and node', async ({ page }) => {
+	await open(page, '/#/events?q=leading');
+	await expect(page.locator('h1')).toHaveText('Events');
+	// A leading change of this console's own epoch to find. Cluster events
+	// need the same nodes observed in both rounds, so first all three.
+	await expect(page.locator('header .pill', { hasText: 'observed' })).toHaveText('3 / 3 observed', { timeout: 10_000 });
+	await page.waitForTimeout(1500);
+	const [a, b] = nodes[0]!.leading ? [nodes[0]!, nodes[1]!] : [nodes[1]!, nodes[0]!];
+	a.leading = 0;
+	b.leading = 1;
+	const rows = page.locator('table.events tbody tr:not(.gap)');
+	await expect(rows.first()).toBeVisible();
+	for (const text of await rows.allTextContents()) expect(text).toContain('leading');
+	await page.locator('#search').fill('no such event anywhere');
+	await expect(page.locator('main')).toContainText('No event matches the filter.');
+});

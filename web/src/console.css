@@ -76,6 +76,18 @@ table.durability td .tag { margin-left: 6px; }
 table.durability td .bar { margin-top: 4px; min-width: 80px; }
 .foot-note { margin-top: 12px; font-size: 12px; }
 ul.series { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 16px; list-style: none; padding: 0; font-size: 13px; }
+#search { font: 13px var(--st-font); width: 240px; padding: 5px 10px; background: var(--st-bg-2); color: var(--st-text); border: 1px solid var(--st-border); border-radius: var(--st-radius); }
+#search:focus { border-color: var(--st-accent); outline: none; box-shadow: 0 0 0 3px var(--st-accent-soft); }
+nav a { display: flex; align-items: center; justify-content: space-between; }
+kbd { font: 11px var(--st-mono); color: var(--st-text-2); border: 1px solid var(--st-border); border-bottom-width: 2px; border-radius: var(--st-radius); padding: 0 5px; min-width: 18px; text-align: center; }
+nav a kbd { opacity: .7; }
+.filtered { color: var(--st-text-2); margin-bottom: 12px; }
+button.link { background: none; border: 0; color: var(--st-accent); font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
+dialog { background: var(--st-bg-2); color: var(--st-text); border: 1px solid var(--st-border); border-radius: var(--st-radius); padding: 20px 24px; min-width: 340px; }
+dialog::backdrop { background: rgb(0 0 0 / .5); }
+dialog h2 { font: 700 18px var(--st-display); margin-bottom: 12px; }
+dialog dl { grid-template-columns: auto 1fr; gap: 8px 16px; margin-bottom: 16px; }
+dialog dd { font-family: var(--st-font); text-align: left; color: var(--st-text-2); }
 tr.gap td { color: var(--st-warning); font: 12px var(--st-mono); background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--st-warning) 7%, transparent) 6px 12px); }
 
 @media (max-width: 720px) {
