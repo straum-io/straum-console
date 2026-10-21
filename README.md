@@ -4,6 +4,8 @@ A web console for [Straum](https://github.com/straum-io/straum) clusters:
 every node on one screen, with each value showing where it came from and
 how old it is.
 
+**Docs:** [straum-io.github.io/ecosystem/straum-console](https://straum-io.github.io/ecosystem/straum-console/)
+
 > **Status: early.** It reads the nodes and shows them on six pages
 > (Overview, Cluster & Leader, Replication & Durability, Events,
 > Configuration, Not exposed by the core), with a read-only JSON API, on
