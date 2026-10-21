@@ -6,8 +6,10 @@ import (
 	"flag"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/straum-io/straum-cli/metrics"
 )
@@ -120,5 +122,19 @@ func TestGoldenState(t *testing.T) {
 	}
 	if !bytes.Equal(got, want) {
 		t.Errorf("the state JSON changed; if intended, run make golden and check docs/state-json.md\ngot:\n%s", got)
+	}
+}
+
+func TestErrorCapped(t *testing.T) {
+	long := strings.Repeat("é", 1000) // 2000 bytes from a node's body
+	n := unknown("10.0.0.1:9100")
+	n.Error = long
+	s := nextState(state{}, metrics.Report{Nodes: []metrics.Node{n, unknown("10.0.0.2:9100"), unknown("10.0.0.3:9100")}}, threeNodes)
+	got := s.Nodes[0].Error
+	if len(got) > maxError || !utf8.ValidString(got) || !strings.HasSuffix(got, "…") {
+		t.Errorf("%d bytes, valid %v: %q", len(got), utf8.ValidString(got), got)
+	}
+	if short := "no answer within 1s"; truncate(short, maxError) != short {
+		t.Error("a short error changed")
 	}
 }

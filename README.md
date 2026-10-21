@@ -4,9 +4,9 @@ A web console for [Straum](https://github.com/straum-io/straum) clusters:
 every node on one screen, with each value showing where it came from and
 how old it is.
 
-> **Status: early.** The backend reads the nodes and logs what changes;
-> the HTTP API and the web pages are not built yet. The picture below is a
-> design mockup, not a screenshot.
+> **Status: early.** The backend reads the nodes and serves the
+> read-only JSON API on loopback; the web pages are not built yet. The
+> picture below is a design mockup, not a screenshot.
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="docs/assets/overview-light.png">
@@ -52,19 +52,28 @@ make build
 bin/straum-console --node 0=127.0.0.1:9100,1=127.0.0.1:9101,2=127.0.0.1:9102
 ```
 
-Each node is `id=host:port`, the id the node should report. The console
-polls every 2 s (`--interval`) and logs, as JSON lines on stderr, each node
-that turns observed or unknown, a node reporting another id, and which
-nodes report leading. `STRAUM_CONSOLE_NODES` and
-`STRAUM_CONSOLE_INTERVAL_MS` stand in for the flags; never put them in a
-straum server's environment, which refuses unknown `STRAUM_*` variables.
+Each node is `id=host:port`, the id the node should report. A node's
+metrics listener is plain HTTP and loopback-only unless the node is told
+otherwise, so the console reaches it in one of the ways the broker allows:
+on the host of a single-host cluster, through an SSH local forward to each
+node (`ssh -L 9100:127.0.0.1:9100 node-a`), or on an isolated network
+where the nodes set `STRAUM_CLUSTER_UNAUTHENTICATED_NETWORK=1`, on the
+broker's own terms.
 
-Until the web pages exist, `straum-cli status` shows the cluster in a
-terminal:
+The console polls every 2 s (`--interval`) and serves on `127.0.0.1:8080`
+(`--listen`, loopback only):
 
 ```sh
-straum-cli status --node 127.0.0.1:9100,127.0.0.1:9101,127.0.0.1:9102
+curl -s localhost:8080/api/v1/state      # every node, as last read
+curl -sN localhost:8080/api/v1/stream    # the state each round, and what changed
+curl -s 'localhost:8080/api/v1/events?after=0'
 ```
+
+[docs/state-json.md](docs/state-json.md) is the schema. Each change is also
+logged once, as a JSON line on stderr. `STRAUM_CONSOLE_NODES`,
+`STRAUM_CONSOLE_INTERVAL_MS` and `STRAUM_CONSOLE_LISTEN` stand in for the
+flags; never put them in a straum server's environment, which refuses
+unknown `STRAUM_*` variables.
 
 `make check` runs the linters and tests; `make e2e` runs a real
 three-node cluster built from a core checkout at `../straum`.

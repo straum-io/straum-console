@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -62,11 +62,10 @@ func TestRound(t *testing.T) {
 	for i, n := range nodes {
 		cfg.nodes = append(cfg.nodes, node{i, serve(t, n.status, n.body, n.delay)})
 	}
-	var logs bytes.Buffer
-	c := newCollector(cfg, slog.New(slog.NewTextHandler(&logs, nil)))
+	c := newCollector(cfg, slog.New(slog.DiscardHandler))
 
 	start := time.Now()
-	s, ok := c.round(context.Background())
+	s, evs, ok := c.round(context.Background())
 	if !ok {
 		t.Fatal("round dropped")
 	}
@@ -74,8 +73,8 @@ func TestRound(t *testing.T) {
 	if took := time.Since(start); took > 1500*time.Millisecond {
 		t.Errorf("round took %s", took)
 	}
-	if s.Nodes[0].State != metrics.Observed || s.Cluster.Observed != 1 || !strings.Contains(logs.String(), "node observed") {
-		t.Fatalf("node 0: %+v\n%s", s.Nodes[0], logs.String())
+	if s.Nodes[0].State != metrics.Observed || s.Cluster.Observed != 1 {
+		t.Fatalf("node 0: %+v", s.Nodes[0])
 	}
 	for i, n := range nodes[1:] {
 		got := s.Nodes[i+1]
@@ -83,9 +82,10 @@ func TestRound(t *testing.T) {
 			t.Errorf("node %d: %+v, want unknown with %q", i+1, got, n.error)
 		}
 	}
-	// Only node 0 answers, and it reports its configured id.
-	if strings.Contains(logs.String(), "reports another id") {
-		t.Errorf("no id mismatch expected:\n%s", logs.String())
+	// The first round has nothing to compare with, and node 0 reports its
+	// configured id: no event.
+	if len(evs) != 0 {
+		t.Errorf("events: %+v", evs)
 	}
 }
 
@@ -101,21 +101,25 @@ func TestRoundIDMismatch(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	cfg := config{interval: 2 * time.Second, nodes: []node{{5, strings.TrimPrefix(srv.URL, "http://")}}}
-	var logs bytes.Buffer
-	c := newCollector(cfg, slog.New(slog.NewTextHandler(&logs, nil)))
-	s, _ := c.round(context.Background())
+	c := newCollector(cfg, slog.New(slog.DiscardHandler))
+	s, _, _ := c.round(context.Background())
 	// Observed, shown with both ids.
 	if s.Nodes[0].State != metrics.Observed || s.Nodes[0].ID != 5 || s.Nodes[0].Metrics["straum_node"] != 0 {
 		t.Fatalf("%+v", s.Nodes[0])
 	}
-	// Logged once per epoch, however often the node goes and comes back.
+	// Raised once per epoch, however often the node goes and comes back.
 	c.round(context.Background())
 	down.Store(true)
 	c.round(context.Background())
 	down.Store(false)
 	c.round(context.Background())
-	if n := strings.Count(logs.String(), "reports another id"); n != 1 {
-		t.Errorf("logged %d times:\n%s", n, logs.String())
+	var names []string
+	for _, e := range c.hub.after(0, 2000) {
+		names = append(names, e.Name)
+	}
+	want := []string{"console.node.id_mismatch", "console.node.unreachable", "console.node.reachable"}
+	if !slices.Equal(names, want) {
+		t.Errorf("events %v, want %v", names, want)
 	}
 }
 
@@ -145,7 +149,7 @@ func TestRoundCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	// Shutting down does not turn an answering node unknown.
-	if s, ok := c.round(ctx); ok || s.Round != 1 || s.Nodes[0].State != metrics.Observed {
+	if s, _, ok := c.round(ctx); ok || s.Round != 1 || s.Nodes[0].State != metrics.Observed {
 		t.Fatalf("ok=%v %+v", ok, s)
 	}
 }
