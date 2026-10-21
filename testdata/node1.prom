@@ -1,0 +1,293 @@
+# HELP straum_node This node's id.
+# TYPE straum_node gauge
+straum_node 1
+# HELP straum_log_end The local log's last lsn.
+# TYPE straum_log_end gauge
+straum_log_end 10
+# HELP straum_log_durable The local log durable through this lsn.
+# TYPE straum_log_durable gauge
+straum_log_durable 10
+# HELP straum_commit The commit point this node knows.
+# TYPE straum_commit gauge
+straum_commit 10
+# HELP straum_applied The last lsn applied here.
+# TYPE straum_applied gauge
+straum_applied 10
+# HELP straum_slot The highest slot this node promised.
+# TYPE straum_slot gauge
+straum_slot 1
+# HELP straum_leading 1 while this node sequences its slot.
+# TYPE straum_leading gauge
+straum_leading 0
+# HELP straum_uncommitted Lsns in the local log past the commit point.
+# TYPE straum_uncommitted gauge
+straum_uncommitted 0
+# HELP straum_proposal_commit_seconds This node's own proposals: accepted into the outbox until its record is applied here.
+# TYPE straum_proposal_commit_seconds histogram
+straum_proposal_commit_seconds_bucket{le="0.000001"} 0
+straum_proposal_commit_seconds_bucket{le="0.000002"} 0
+straum_proposal_commit_seconds_bucket{le="0.000004"} 0
+straum_proposal_commit_seconds_bucket{le="0.000008"} 0
+straum_proposal_commit_seconds_bucket{le="0.000016"} 0
+straum_proposal_commit_seconds_bucket{le="0.000032"} 0
+straum_proposal_commit_seconds_bucket{le="0.000064"} 0
+straum_proposal_commit_seconds_bucket{le="0.000128"} 0
+straum_proposal_commit_seconds_bucket{le="0.000256"} 0
+straum_proposal_commit_seconds_bucket{le="0.000512"} 0
+straum_proposal_commit_seconds_bucket{le="0.001024"} 0
+straum_proposal_commit_seconds_bucket{le="0.002048"} 0
+straum_proposal_commit_seconds_bucket{le="0.004096"} 0
+straum_proposal_commit_seconds_bucket{le="0.008192"} 0
+straum_proposal_commit_seconds_bucket{le="0.016384"} 0
+straum_proposal_commit_seconds_bucket{le="0.032768"} 0
+straum_proposal_commit_seconds_bucket{le="0.065536"} 0
+straum_proposal_commit_seconds_bucket{le="0.131072"} 0
+straum_proposal_commit_seconds_bucket{le="0.262144"} 1
+straum_proposal_commit_seconds_bucket{le="0.524288"} 1
+straum_proposal_commit_seconds_bucket{le="1.048576"} 1
+straum_proposal_commit_seconds_bucket{le="2.097152"} 1
+straum_proposal_commit_seconds_bucket{le="4.194304"} 1
+straum_proposal_commit_seconds_bucket{le="8.388608"} 1
+straum_proposal_commit_seconds_bucket{le="16.777216"} 1
+straum_proposal_commit_seconds_bucket{le="33.554432"} 1
+straum_proposal_commit_seconds_bucket{le="67.108864"} 1
+straum_proposal_commit_seconds_bucket{le="+Inf"} 1
+straum_proposal_commit_seconds_sum 0.167833
+straum_proposal_commit_seconds_count 1
+# HELP straum_append_durable_seconds A batch handed to the local log until it is durable there.
+# TYPE straum_append_durable_seconds histogram
+straum_append_durable_seconds_bucket{le="0.000001"} 0
+straum_append_durable_seconds_bucket{le="0.000002"} 0
+straum_append_durable_seconds_bucket{le="0.000004"} 0
+straum_append_durable_seconds_bucket{le="0.000008"} 0
+straum_append_durable_seconds_bucket{le="0.000016"} 0
+straum_append_durable_seconds_bucket{le="0.000032"} 0
+straum_append_durable_seconds_bucket{le="0.000064"} 0
+straum_append_durable_seconds_bucket{le="0.000128"} 0
+straum_append_durable_seconds_bucket{le="0.000256"} 0
+straum_append_durable_seconds_bucket{le="0.000512"} 0
+straum_append_durable_seconds_bucket{le="0.001024"} 0
+straum_append_durable_seconds_bucket{le="0.002048"} 0
+straum_append_durable_seconds_bucket{le="0.004096"} 2
+straum_append_durable_seconds_bucket{le="0.008192"} 3
+straum_append_durable_seconds_bucket{le="0.016384"} 4
+straum_append_durable_seconds_bucket{le="0.032768"} 5
+straum_append_durable_seconds_bucket{le="0.065536"} 5
+straum_append_durable_seconds_bucket{le="0.131072"} 5
+straum_append_durable_seconds_bucket{le="0.262144"} 5
+straum_append_durable_seconds_bucket{le="0.524288"} 5
+straum_append_durable_seconds_bucket{le="1.048576"} 5
+straum_append_durable_seconds_bucket{le="2.097152"} 5
+straum_append_durable_seconds_bucket{le="4.194304"} 5
+straum_append_durable_seconds_bucket{le="8.388608"} 5
+straum_append_durable_seconds_bucket{le="16.777216"} 5
+straum_append_durable_seconds_bucket{le="33.554432"} 5
+straum_append_durable_seconds_bucket{le="67.108864"} 5
+straum_append_durable_seconds_bucket{le="+Inf"} 5
+straum_append_durable_seconds_sum 0.045045
+straum_append_durable_seconds_count 5
+# HELP straum_append_commit_seconds A batch handed to the local log until this node knows it committed.
+# TYPE straum_append_commit_seconds histogram
+straum_append_commit_seconds_bucket{le="0.000001"} 0
+straum_append_commit_seconds_bucket{le="0.000002"} 0
+straum_append_commit_seconds_bucket{le="0.000004"} 0
+straum_append_commit_seconds_bucket{le="0.000008"} 0
+straum_append_commit_seconds_bucket{le="0.000016"} 0
+straum_append_commit_seconds_bucket{le="0.000032"} 0
+straum_append_commit_seconds_bucket{le="0.000064"} 0
+straum_append_commit_seconds_bucket{le="0.000128"} 0
+straum_append_commit_seconds_bucket{le="0.000256"} 0
+straum_append_commit_seconds_bucket{le="0.000512"} 0
+straum_append_commit_seconds_bucket{le="0.001024"} 0
+straum_append_commit_seconds_bucket{le="0.002048"} 0
+straum_append_commit_seconds_bucket{le="0.004096"} 0
+straum_append_commit_seconds_bucket{le="0.008192"} 0
+straum_append_commit_seconds_bucket{le="0.016384"} 1
+straum_append_commit_seconds_bucket{le="0.032768"} 2
+straum_append_commit_seconds_bucket{le="0.065536"} 5
+straum_append_commit_seconds_bucket{le="0.131072"} 5
+straum_append_commit_seconds_bucket{le="0.262144"} 5
+straum_append_commit_seconds_bucket{le="0.524288"} 5
+straum_append_commit_seconds_bucket{le="1.048576"} 5
+straum_append_commit_seconds_bucket{le="2.097152"} 5
+straum_append_commit_seconds_bucket{le="4.194304"} 5
+straum_append_commit_seconds_bucket{le="8.388608"} 5
+straum_append_commit_seconds_bucket{le="16.777216"} 5
+straum_append_commit_seconds_bucket{le="33.554432"} 5
+straum_append_commit_seconds_bucket{le="67.108864"} 5
+straum_append_commit_seconds_bucket{le="+Inf"} 5
+straum_append_commit_seconds_sum 0.192523
+straum_append_commit_seconds_count 5
+# HELP straum_proposals_accepted_total Own proposals accepted into the outbox.
+# TYPE straum_proposals_accepted_total counter
+straum_proposals_accepted_total 1
+# HELP straum_proposals_refused_total Own proposals refused at a full outbox: never accepted.
+# TYPE straum_proposals_refused_total counter
+straum_proposals_refused_total 0
+# HELP straum_proposals_committed_total Own proposals whose record was applied here.
+# TYPE straum_proposals_committed_total counter
+straum_proposals_committed_total 1
+# HELP straum_proposals_given_up_total Own proposals shown lost by a later one committing first.
+# TYPE straum_proposals_given_up_total counter
+straum_proposals_given_up_total 0
+# HELP straum_outbox_entries Own proposals accepted and awaiting commit.
+# TYPE straum_outbox_entries gauge
+straum_outbox_entries 0
+# HELP straum_outbox_sent Of those, sent and awaiting their slot's decision.
+# TYPE straum_outbox_sent gauge
+straum_outbox_sent 0
+# HELP straum_outbox_bytes Bytes the outbox holds (bodies and properties).
+# TYPE straum_outbox_bytes gauge
+straum_outbox_bytes 0
+# HELP straum_outbox_capacity The outbox's bound: max_queue / voters.
+# TYPE straum_outbox_capacity gauge
+straum_outbox_capacity 341
+# HELP straum_outbox_resent_total Own proposals sent again after their slot closed.
+# TYPE straum_outbox_resent_total counter
+straum_outbox_resent_total 0
+# HELP straum_forwards_refused_total Other nodes' forwards this sequencer's full or sealed queue refused.
+# TYPE straum_forwards_refused_total counter
+straum_forwards_refused_total 0
+# HELP straum_forwards_dropped_total Own proposals' forwards dropped at a full link queue: lost, given up once a later one commits.
+# TYPE straum_forwards_dropped_total counter
+straum_forwards_dropped_total 0
+# HELP straum_link_drops_total Frames dropped at a full link queue, forwards included; the protocol resends the rest.
+# TYPE straum_link_drops_total counter
+straum_link_drops_total 0
+# HELP straum_read_block_spells_total Spells in which no MQTT client was read: the outbox was full.
+# TYPE straum_read_block_spells_total counter
+straum_read_block_spells_total 0
+# HELP straum_read_block_seconds_total Time spent in such spells.
+# TYPE straum_read_block_seconds_total gauge
+straum_read_block_seconds_total 0
+# HELP straum_read_block_longest_seconds The longest such spell, the open one included.
+# TYPE straum_read_block_longest_seconds gauge
+straum_read_block_longest_seconds 0
+# HELP straum_replica_durable A replica's durable lsn, as it last reported to this sequencer.
+# TYPE straum_replica_durable gauge
+# HELP straum_replica_lag Lsns a replica's durable position is behind the commit point.
+# TYPE straum_replica_lag gauge
+# HELP straum_heard_commit The commit point this node has heard of, not capped at its log's end.
+# TYPE straum_heard_commit gauge
+straum_heard_commit 10
+# HELP straum_lag Positions this node's log is behind the commit point it heard.
+# TYPE straum_lag gauge
+straum_lag 0
+# HELP straum_lag_rate How fast that lag changes, positions a second; above 0 while it grows.
+# TYPE straum_lag_rate gauge
+straum_lag_rate 0
+# HELP straum_progress_age_seconds Time since this node's log end last moved.
+# TYPE straum_progress_age_seconds gauge
+straum_progress_age_seconds 2.115083209
+# HELP straum_catching_up 1 while lag is above 0. An indicator only: a healthy replica under load is a few positions behind too; telling catch-up from normal replication takes lag, rate and age together.
+# TYPE straum_catching_up gauge
+straum_catching_up 0
+# HELP straum_serving 1 once this node's gateway takes clients: its own reset is applied.
+# TYPE straum_serving gauge
+straum_serving 1
+# HELP straum_replica_progress_age_seconds Time since a replica's durable position last moved, as this sequencer saw it.
+# TYPE straum_replica_progress_age_seconds gauge
+# HELP straum_replica_lag_rate How fast a replica's lag changes, positions a second; above 0 while it grows.
+# TYPE straum_replica_lag_rate gauge
+# HELP straum_progress_ticks_total Heartbeats at which this node's progress was sampled.
+# TYPE straum_progress_ticks_total counter
+straum_progress_ticks_total 46
+# HELP straum_progress_still_ticks_total Of those, heartbeats with a lag and no movement.
+# TYPE straum_progress_still_ticks_total counter
+straum_progress_still_ticks_total 0
+# HELP straum_progress_advanced_total Positions this node's log end moved over those heartbeats.
+# TYPE straum_progress_advanced_total counter
+straum_progress_advanced_total 10
+# HELP straum_replica_still_ticks_total Heartbeats with a replica behind and its durable position not moved.
+# TYPE straum_replica_still_ticks_total counter
+# HELP straum_replica_bytes_in_flight Record bytes sent to a replica and not yet reported durable, resends included.
+# TYPE straum_replica_bytes_in_flight gauge
+# HELP straum_replica_bytes_in_flight_max The most seen.
+# TYPE straum_replica_bytes_in_flight_max gauge
+# HELP straum_replica_positions_in_flight Positions sent past a replica's durable position.
+# TYPE straum_replica_positions_in_flight gauge
+# HELP straum_link_queued_frames Frames queued for the link to a peer at the last heartbeat.
+# TYPE straum_link_queued_frames gauge
+# HELP straum_takeovers_started_total Takeovers this node started after its owner's silence.
+# TYPE straum_takeovers_started_total counter
+straum_takeovers_started_total 0
+# HELP straum_takeovers_completed_total Of those, ending with this node sequencing the slot.
+# TYPE straum_takeovers_completed_total counter
+straum_takeovers_completed_total 0
+# HELP straum_takeovers_abandoned_total Of those, abandoned: another slot won, or the owner was heard.
+# TYPE straum_takeovers_abandoned_total counter
+straum_takeovers_abandoned_total 0
+# HELP straum_takeover_seconds A takeover by silence, started until this node sequences the slot.
+# TYPE straum_takeover_seconds histogram
+straum_takeover_seconds_bucket{le="0.000001"} 0
+straum_takeover_seconds_bucket{le="0.000002"} 0
+straum_takeover_seconds_bucket{le="0.000004"} 0
+straum_takeover_seconds_bucket{le="0.000008"} 0
+straum_takeover_seconds_bucket{le="0.000016"} 0
+straum_takeover_seconds_bucket{le="0.000032"} 0
+straum_takeover_seconds_bucket{le="0.000064"} 0
+straum_takeover_seconds_bucket{le="0.000128"} 0
+straum_takeover_seconds_bucket{le="0.000256"} 0
+straum_takeover_seconds_bucket{le="0.000512"} 0
+straum_takeover_seconds_bucket{le="0.001024"} 0
+straum_takeover_seconds_bucket{le="0.002048"} 0
+straum_takeover_seconds_bucket{le="0.004096"} 0
+straum_takeover_seconds_bucket{le="0.008192"} 0
+straum_takeover_seconds_bucket{le="0.016384"} 0
+straum_takeover_seconds_bucket{le="0.032768"} 0
+straum_takeover_seconds_bucket{le="0.065536"} 0
+straum_takeover_seconds_bucket{le="0.131072"} 0
+straum_takeover_seconds_bucket{le="0.262144"} 0
+straum_takeover_seconds_bucket{le="0.524288"} 0
+straum_takeover_seconds_bucket{le="1.048576"} 0
+straum_takeover_seconds_bucket{le="2.097152"} 0
+straum_takeover_seconds_bucket{le="4.194304"} 0
+straum_takeover_seconds_bucket{le="8.388608"} 0
+straum_takeover_seconds_bucket{le="16.777216"} 0
+straum_takeover_seconds_bucket{le="33.554432"} 0
+straum_takeover_seconds_bucket{le="67.108864"} 0
+straum_takeover_seconds_bucket{le="+Inf"} 0
+straum_takeover_seconds_sum 0
+straum_takeover_seconds_count 0
+# HELP straum_successions_total Slots taken over by a committed SlotEnd (handoff).
+# TYPE straum_successions_total counter
+straum_successions_total 0
+# HELP straum_slots_led_total Slots this node began sequencing.
+# TYPE straum_slots_led_total counter
+straum_slots_led_total 0
+# HELP straum_stepped_down_total Times this node stopped sequencing: handed over, or fenced by a newer slot.
+# TYPE straum_stepped_down_total counter
+straum_stepped_down_total 0
+# HELP straum_mqtt_connections Open MQTT connections.
+# TYPE straum_mqtt_connections gauge
+straum_mqtt_connections 0
+# HELP straum_mqtt_pending Client requests proposed and awaiting commit.
+# TYPE straum_mqtt_pending gauge
+straum_mqtt_pending 0
+# HELP straum_mqtt_pending_bytes Their bytes.
+# TYPE straum_mqtt_pending_bytes gauge
+straum_mqtt_pending_bytes 0
+# HELP straum_mqtt_waiting_bytes Deliveries held for clients' receive maximum.
+# TYPE straum_mqtt_waiting_bytes gauge
+straum_mqtt_waiting_bytes 0
+# HELP straum_mqtt_publishes_total PUBLISH packets proposed to the log.
+# TYPE straum_mqtt_publishes_total counter
+straum_mqtt_publishes_total 0
+# HELP straum_mqtt_pubacks_total PUBACKs sent, each after its commit.
+# TYPE straum_mqtt_pubacks_total counter
+straum_mqtt_pubacks_total 0
+# HELP straum_mqtt_deliveries_total PUBLISH packets sent to subscribers.
+# TYPE straum_mqtt_deliveries_total counter
+straum_mqtt_deliveries_total 0
+# HELP straum_mqtt_dropped_total At-most-once deliveries dropped at the waiting bounds.
+# TYPE straum_mqtt_dropped_total counter
+straum_mqtt_dropped_total 0
+# HELP straum_mqtt_closed_total Connections closed.
+# TYPE straum_mqtt_closed_total counter
+straum_mqtt_closed_total 0
+# HELP straum_mqtt_closed_keep_alive_total Of those, for keep-alive silence.
+# TYPE straum_mqtt_closed_keep_alive_total counter
+straum_mqtt_closed_keep_alive_total 0
+# HELP straum_mqtt_closed_commit_timeout_total Of those, for a proposal not committed in time.
+# TYPE straum_mqtt_closed_commit_timeout_total counter
+straum_mqtt_closed_commit_timeout_total 0

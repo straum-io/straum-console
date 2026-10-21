@@ -192,7 +192,7 @@ and `epoch` changes.
 | `console.node.unreachable` | observed → unknown | the node | `{"error", "last_observed_at"}` |
 | `console.node.reachable` | unknown → observed (not on the node's first observation) | the node | `{"unknown_for_ms"}` |
 | `console.node.id_mismatch` | the node is observed reporting a `straum_node` ≠ its configured id, and has not reported that id before in this epoch. Once per epoch per node and reported id, whatever the node's state in round k−1 | the node | `{"configured", "reported"}` |
-| `console.collector.overrun` | a poll tick was skipped because the node's previous request was still running. In that round the node is `unknown`, `error` says so, and `latency_ms` is how long the request has been running | the node | `{"skipped"}` |
+| `console.collector.overrun` | a poll tick was skipped: the round started at least two intervals after the previous one (the console itself stalled; a node's request cannot cause it, its timeout is under half the interval) | null | `{"skipped"}` |
 | `cluster.max_slot.changed` | `cluster.max_slot` changed, and the same nodes were observed in both rounds | null | `{"from", "to"}` |
 | `cluster.leading.changed` | `cluster.leading` differs from round k−1, and the same nodes were observed in both rounds | null | `{"from", "to", "max_slot"}` |
 | `node.serving.changed` | `straum_serving` differs, the node observed in both rounds | the node | `{"from", "to"}` |
