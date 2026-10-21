@@ -30,7 +30,9 @@ header h1 { font: 700 20px var(--st-display); letter-spacing: -0.025em; }
 :focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
 
 .banner { margin: 16px 24px 0; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--st-warning) 35%, transparent); border-left: 3px solid var(--st-warning); background: color-mix(in srgb, var(--st-warning) 8%, var(--st-bg)); border-radius: var(--st-radius); }
-main { padding: 20px 24px; max-width: 1400px; }
+/* The content column may be narrower than a wide table: the table scrolls, not the page. */
+.main { min-width: 0; }
+main { padding: 20px 24px; max-width: 1400px; overflow-x: auto; }
 .none, .note { color: var(--st-text-2); }
 .note { margin-bottom: 14px; max-width: 70em; }
 
@@ -83,7 +85,7 @@ kbd { font: 11px var(--st-mono); color: var(--st-text-2); border: 1px solid var(
 nav a kbd { opacity: .7; }
 .filtered { color: var(--st-text-2); margin-bottom: 12px; }
 button.link { background: none; border: 0; color: var(--st-accent); font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
-dialog { background: var(--st-bg-2); color: var(--st-text); border: 1px solid var(--st-border); border-radius: var(--st-radius); padding: 20px 24px; min-width: 340px; }
+dialog { margin: auto; background: var(--st-bg-2); color: var(--st-text); border: 1px solid var(--st-border); border-radius: var(--st-radius); padding: 20px 24px; min-width: 340px; }
 dialog::backdrop { background: rgb(0 0 0 / .5); }
 dialog h2 { font: 700 18px var(--st-display); margin-bottom: 12px; }
 dialog dl { grid-template-columns: auto 1fr; gap: 8px 16px; margin-bottom: 16px; }
