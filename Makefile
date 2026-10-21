@@ -1,10 +1,13 @@
 # The straum core checkout, for the e2e test.
 CORE ?= ../straum
 
-.PHONY: build test lint check e2e golden web web-test web-size clean
+.PHONY: build test lint check e2e soak bench golden web web-test web-size release-snapshot clean
+
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 build:
-	CGO_ENABLED=0 go build -ldflags '-s -w' -o bin/straum-console .
+	CGO_ENABLED=0 go build -ldflags '-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)' -o bin/straum-console .
 
 test:
 	go test -race ./...
@@ -21,6 +24,13 @@ check: lint test build
 e2e:
 	cd $(CORE) && cargo build -p server --bin straum-server
 	STRAUM_SERVER_BIN=$(abspath $(CORE))/target/debug/straum-server go test -tags e2e -race -count=1 -run E2E ./...
+
+# Plan §14 under load: 5 fixture nodes, 64 streams, SOAK_DURATION (1h).
+soak: build
+	SOAK_OUT=$${SOAK_OUT:-soak.csv} go test -tags soak -run Soak -count=1 -timeout 3h -v .
+
+bench:
+	go test -run '^$$' -bench . -benchmem -count=10 .
 
 # The frontend (needs Node): install from the lockfile, type-check, build
 # web/dist, which the binary embeds and git keeps.
@@ -39,5 +49,13 @@ web-size:
 golden:
 	go test . -run TestGolden -update
 
+GORELEASER := go run github.com/goreleaser/goreleaser/v2@v2.18.3
+
+# Check .goreleaser.yaml and build every release archive locally, without
+# publishing anything.
+release-snapshot:
+	$(GORELEASER) check
+	$(GORELEASER) release --snapshot --clean
+
 clean:
-	rm -rf bin web/node_modules web/test-results
+	rm -rf bin dist web/node_modules web/test-results

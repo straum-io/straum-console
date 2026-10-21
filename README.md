@@ -73,12 +73,31 @@ curl -s 'localhost:8080/api/v1/events?after=0'
 
 [docs/state-json.md](docs/state-json.md) is the schema. Each change is also
 logged once, as a JSON line on stderr. `STRAUM_CONSOLE_NODES`,
-`STRAUM_CONSOLE_INTERVAL_MS` and `STRAUM_CONSOLE_LISTEN` stand in for the
-flags; never put them in a straum server's environment, which refuses
-unknown `STRAUM_*` variables.
+`STRAUM_CONSOLE_INTERVAL_MS`, `STRAUM_CONSOLE_LISTEN` and
+`STRAUM_CONSOLE_DEBUG_LISTEN` stand in for the flags; never put them in a
+straum server's environment, which refuses unknown `STRAUM_*` variables.
+[docs/straum-console.service](docs/straum-console.service) is an example
+systemd unit. `--debug-listen 127.0.0.1:6060` serves Go's `pprof` on a
+second loopback address, off by default: a local diagnostic that any local
+process can use to start profiles, so leave it off in normal running.
+
+No release is published yet; `make build` is the way in. Releases will be
+built for Linux, macOS and Windows on amd64 and arm64
+(`make release-snapshot` builds them locally).
+
+A release is a pushed `v*` tag on `main`. The workflow builds the archives,
+`checksums.txt` and a signed build provenance for each
+(`gh attestation verify <archive> -R straum-io/straum-console`), and leaves
+the release as a draft that a person reads and publishes. A bad release is
+withdrawn by unpublishing it (its tag stays, so the archives keep their
+provenance), and fixed by a new patch version; `CHANGELOG.md` says what
+changed and why.
 
 `make check` runs the linters and tests; `make e2e` runs a real
-three-node cluster built from a core checkout at `../straum`. The web pages
+three-node cluster built from a core checkout at `../straum`, including a
+killed leader and a frozen node. `make soak` holds 5 nodes and 64 streams
+for an hour against the memory and CPU budgets; `make bench` measures a
+round. What was measured is in [docs/performance.md](docs/performance.md). The web pages
 are Preact in TypeScript under `web/`; the built files in `web/dist` are
 committed, so `go build` needs no Node. After changing `web/src`, run
 `make web` (Node 22) and `make web-test` (Playwright).

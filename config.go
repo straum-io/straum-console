@@ -19,6 +19,9 @@ type config struct {
 	nodes    []node
 	interval time.Duration
 	listen   string
+	// debugListen serves net/http/pprof when set: loopback only, off by default.
+	debugListen string
+	version     bool
 }
 
 // node is one configured metrics endpoint and the id it is expected to
@@ -32,6 +35,7 @@ const (
 	envNodes    = "STRAUM_CONSOLE_NODES"
 	envInterval = "STRAUM_CONSOLE_INTERVAL_MS"
 	envListen   = "STRAUM_CONSOLE_LISTEN"
+	envDebug    = "STRAUM_CONSOLE_DEBUG_LISTEN"
 
 	defaultListen = "127.0.0.1:8080"
 
@@ -56,7 +60,7 @@ func parseConfig(args, environ []string, stderr io.Writer) (config, error) {
 		if !strings.HasPrefix(k, "STRAUM_CONSOLE_") {
 			continue
 		}
-		if k != envNodes && k != envInterval && k != envListen {
+		if k != envNodes && k != envInterval && k != envListen && k != envDebug {
 			return config{}, fmt.Errorf("unknown variable %s", k)
 		}
 		env[k] = v
@@ -68,6 +72,8 @@ func parseConfig(args, environ []string, stderr io.Writer) (config, error) {
 	fs.Var(&nodes, "node", "a node as id=host:port, its metrics address (repeatable or comma-separated; else "+envNodes+")")
 	interval := fs.Duration("interval", defaultInterval, "time between polls, 1s to 1m (else "+envInterval+")")
 	listen := fs.String("listen", defaultListen, "where to serve /api/v1, a loopback address only (else "+envListen+")")
+	debugListen := fs.String("debug-listen", "", "where to serve net/http/pprof, a loopback address only; off when empty (else "+envDebug+")")
+	version := fs.Bool("version", false, "print the version and exit")
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
 	}
@@ -76,6 +82,9 @@ func parseConfig(args, environ []string, stderr io.Writer) (config, error) {
 	}
 	set := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
+	if *version {
+		return config{version: true}, nil
+	}
 
 	var cfg config
 	spec := strings.Join(nodes, ",")
@@ -112,6 +121,15 @@ func parseConfig(args, environ []string, stderr io.Writer) (config, error) {
 	}
 	if err := checkListen(cfg.listen); err != nil {
 		return config{}, err
+	}
+	cfg.debugListen = *debugListen
+	if v, ok := env[envDebug]; ok && !set["debug-listen"] {
+		cfg.debugListen = v
+	}
+	if cfg.debugListen != "" {
+		if err := checkListen(cfg.debugListen); err != nil {
+			return config{}, fmt.Errorf("debug %w", err)
+		}
 	}
 	return cfg, nil
 }

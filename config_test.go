@@ -39,6 +39,7 @@ func TestConfig(t *testing.T) {
 		{name: "listen on every interface", args: []string{"--node", "0=127.0.0.1:9100", "--listen", ":8080"}, err: "loopback"},
 		{name: "listen by host name", env: []string{"STRAUM_CONSOLE_NODES=0=127.0.0.1:9100", "STRAUM_CONSOLE_LISTEN=localhost:8080"}, err: "loopback"},
 		{name: "listen on a LAN address", env: []string{"STRAUM_CONSOLE_NODES=0=127.0.0.1:9100", "STRAUM_CONSOLE_LISTEN=10.0.0.5:8080"}, err: "loopback"},
+		{name: "debug listener beyond loopback", args: []string{"--node", "0=127.0.0.1:9100", "--debug-listen", "0.0.0.0:6060"}, err: "debug listen"},
 		{name: "stray argument", args: []string{"--node", "0=127.0.0.1:9100", "extra"}, err: "unexpected argument"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
