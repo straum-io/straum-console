@@ -1,5 +1,9 @@
 # <img src="docs/assets/mark.svg" width="28" alt=""> straum-console
 
+[![CI](https://github.com/straum-io/straum-console/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/straum-io/straum-console/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+![Status: experimental](https://img.shields.io/badge/status-experimental-orange)
+
 A web console for [Straum](https://github.com/straum-io/straum) clusters:
 every node on one screen, with each value showing where it came from and
 how old it is.
