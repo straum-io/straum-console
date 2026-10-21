@@ -74,8 +74,9 @@ three-node cluster built from a core checkout at `../straum`.
 - [docs/state-json.md](docs/state-json.md): the read-only JSON API, version 1.
 - [Straum](https://github.com/straum-io/straum): the broker, and its
   [metrics endpoint](https://github.com/straum-io/straum/blob/main/docs/configuration.md).
-- The look comes from the Straum docs site, which is not published yet:
-  the same colors and fonts (`src/styles/tokens.css` in straum-docs), dark
-  by default.
+- [The console's page](https://straum-io.github.io/ecosystem/straum-console/)
+  on the Straum docs site. The console takes the site's look: the colors
+  and fonts of [`tokens.css`](https://github.com/straum-io/straum-io.github.io/blob/17cfc25/src/styles/tokens.css)
+  at `17cfc25`, dark by default.
 
 Apache License 2.0.
