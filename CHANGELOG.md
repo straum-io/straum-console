@@ -25,6 +25,10 @@ their own schema version (`docs/state-json.md`).
 - `STRAUM_CONSOLE_NODES`, `STRAUM_CONSOLE_INTERVAL_MS`,
   `STRAUM_CONSOLE_LISTEN` and `STRAUM_CONSOLE_DEBUG_LISTEN` in place of the
   flags; an unknown `STRAUM_CONSOLE_*` variable is a startup error.
+- Keyboard shortcuts: `1`–`6` open the pages, `/` filters (`Esc` clears
+  it), `t` switches the theme, `?` lists the keys.
+- A filter on every page: nodes by id, address, state or error, events by
+  name, node or text; it stays in the URL (`#/events?q=leading`).
 - `--debug-listen`: `net/http/pprof` on a second loopback address, off by
   default.
 - `--version`.

@@ -2,7 +2,8 @@
 // core. Every number is a stable series or computed from them, and a
 // computed one says so (CON-D-1 A).
 import { state, ageMs } from './api';
-import { Fact, StateBadge, age, reading } from './ui';
+import { Fact, Filtered, StateBadge, age, reading } from './ui';
+import { matches, nodeMatches } from './search';
 
 /** The stable series, as the core declares them (D-141 A). */
 const stable = [
@@ -22,6 +23,7 @@ const stable = [
 export function Durability() {
 	const s = state.value;
 	if (!s) return null;
+	const nodes = s.nodes.filter(nodeMatches);
 	return (
 		<>
 			<p class="note">
@@ -29,6 +31,7 @@ export function Durability() {
 				that is durable on a majority of the nodes (the core's ADR-0005). That is the broker's decision, shown here as text,
 				not something the console measures.
 			</p>
+			<Filtered shown={nodes.length} total={s.nodes.length} what="nodes" />
 			<table class="grid durability">
 				<thead>
 					<tr>
@@ -49,7 +52,7 @@ export function Durability() {
 					</tr>
 				</thead>
 				<tbody>
-					{s.nodes.map((n) => {
+					{nodes.map((n) => {
 						const r = reading(n);
 						const m = r?.metrics;
 						const v = (k: string) => m?.[k] ?? 0;
@@ -103,6 +106,7 @@ export function Durability() {
 export function Configuration() {
 	const s = state.value;
 	if (!s) return null;
+	const nodes = s.nodes.filter(nodeMatches);
 	return (
 		<>
 			<div class="facts">
@@ -114,6 +118,7 @@ export function Configuration() {
 				The console's own configuration (<span class="mono">--node</span>, <span class="mono">--interval</span>). The broker
 				exposes none of its own; the console only checks that each node reports the id it was given.
 			</p>
+			<Filtered shown={nodes.length} total={s.nodes.length} what="nodes" />
 			<table class="grid">
 				<thead>
 					<tr>
@@ -125,7 +130,7 @@ export function Configuration() {
 					</tr>
 				</thead>
 				<tbody>
-					{s.nodes.map((n) => {
+					{nodes.map((n) => {
 						const r = reading(n);
 						const reported = r?.metrics['straum_node'];
 						const rendered = r ? stable.filter((k) => k in r.metrics).length : 0;
@@ -221,6 +226,11 @@ const missing: [string, [string, string, string][]][] = [
 ];
 
 export function NotExposed() {
+	const groups = missing
+		.map(([screen, rows]) => [screen, rows.filter((r) => matches(screen, ...r))] as const)
+		.filter(([, rows]) => rows.length > 0);
+	const total = missing.reduce((n, [, rows]) => n + rows.length, 0);
+	const shown = groups.reduce((n, [, rows]) => n + rows.length, 0);
 	return (
 		<>
 			<p class="note">
@@ -228,6 +238,7 @@ export function NotExposed() {
 				be on, with the broker change that would let the console show them. C-numbers are those of the console's plan;
 				straum#32 asks the core for C1.
 			</p>
+			<Filtered shown={shown} total={total} what="rows" />
 			<table class="grid not-exposed">
 				<thead>
 					<tr>
@@ -236,7 +247,7 @@ export function NotExposed() {
 						<th>what would provide it</th>
 					</tr>
 				</thead>
-				{missing.map(([screen, rows]) => (
+				{groups.map(([screen, rows]) => (
 					<tbody data-screen={screen}>
 						<tr class="group">
 							<th colSpan={3}>{screen}</th>
