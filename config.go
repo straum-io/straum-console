@@ -18,6 +18,7 @@ import (
 type config struct {
 	nodes    []node
 	interval time.Duration
+	listen   string
 }
 
 // node is one configured metrics endpoint and the id it is expected to
@@ -30,6 +31,9 @@ type node struct {
 const (
 	envNodes    = "STRAUM_CONSOLE_NODES"
 	envInterval = "STRAUM_CONSOLE_INTERVAL_MS"
+	envListen   = "STRAUM_CONSOLE_LISTEN"
+
+	defaultListen = "127.0.0.1:8080"
 
 	minInterval     = time.Second
 	maxInterval     = time.Minute
@@ -52,7 +56,7 @@ func parseConfig(args, environ []string, stderr io.Writer) (config, error) {
 		if !strings.HasPrefix(k, "STRAUM_CONSOLE_") {
 			continue
 		}
-		if k != envNodes && k != envInterval {
+		if k != envNodes && k != envInterval && k != envListen {
 			return config{}, fmt.Errorf("unknown variable %s", k)
 		}
 		env[k] = v
@@ -63,6 +67,7 @@ func parseConfig(args, environ []string, stderr io.Writer) (config, error) {
 	var nodes nodeFlag
 	fs.Var(&nodes, "node", "a node as id=host:port, its metrics address (repeatable or comma-separated; else "+envNodes+")")
 	interval := fs.Duration("interval", defaultInterval, "time between polls, 1s to 1m (else "+envInterval+")")
+	listen := fs.String("listen", defaultListen, "where to serve /api/v1, a loopback address only (else "+envListen+")")
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
 	}
@@ -99,6 +104,14 @@ func parseConfig(args, environ []string, stderr io.Writer) (config, error) {
 	}
 	if cfg.interval < minInterval || cfg.interval > maxInterval {
 		return config{}, fmt.Errorf("interval %s: want 1s to 1m", cfg.interval)
+	}
+
+	cfg.listen = *listen
+	if v, ok := env[envListen]; ok && !set["listen"] {
+		cfg.listen = v
+	}
+	if err := checkListen(cfg.listen); err != nil {
+		return config{}, err
 	}
 	return cfg, nil
 }

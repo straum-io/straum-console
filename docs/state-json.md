@@ -7,9 +7,18 @@ polls. Both are read-only. The console sends nothing to a node except
 
 | Where | What |
 |---|---|
-| `GET /api/v1/state` | The latest state. |
-| `GET /api/v1/stream` | Server-sent events: `event: state` carries a state after every poll round, `event: event` carries one event with `id:` set to the event's `id`, and `event: gap` says events were missed. |
-| `GET /api/v1/events?after=<id>&limit=<n>` | `{"events": [...]}`: the events after `id`, oldest first, at most `limit` (≤ 2000). |
+| `GET /api/v1/state` | The latest state; 503 until the first round has closed. |
+| `GET /api/v1/stream` | Server-sent events: `event: state` carries a state after every poll round, `event: event` carries one event with `id:` set to `<epoch>/<id>`, and `event: gap` says events were missed. |
+| `GET /api/v1/events?after=<id>&limit=<n>` | `{"events": [...]}`: the events of the current epoch after `id` (default 0), oldest first, at most `limit` (1 to 2000, default 2000). If some were evicted, the first id returned is larger than `after` + 1. Ids restart with each epoch: a client that keeps `after` across a console restart compares `epoch`. |
+
+Every endpoint answers 421 to a request whose `Host` is not `localhost` or
+a loopback address, so a web page cannot reach the API through a name it
+points at 127.0.0.1. Anything but GET and HEAD gets 405. `nodes[].error`
+is at most 256 bytes, cut with `…`: it can quote a node's own output.
+
+Every time is RFC 3339 in UTC, as Go writes it: up to nanoseconds, with
+trailing zeros dropped (`2026-10-21T12:00:02.01Z`), the same as
+`straum-cli status -o json`.
 
 ## Compatibility
 
@@ -190,8 +199,8 @@ and `epoch` changes.
 | `name` | Raised when, between round k−1 and round k | `node` | `data` |
 |---|---|---|---|
 | `console.node.unreachable` | observed → unknown | the node | `{"error", "last_observed_at"}` |
-| `console.node.reachable` | unknown → observed (not on the node's first observation) | the node | `{"unknown_for_ms"}` |
-| `console.node.id_mismatch` | the node is observed reporting a `straum_node` ≠ its configured id, and has not reported that id before in this epoch. Once per epoch per node and reported id, whatever the node's state in round k−1 | the node | `{"configured", "reported"}` |
+| `console.node.reachable` | unknown → observed, when the node was observed before in this epoch | the node | `{"unseen_for_ms"}`: the time between its last observation before and this one |
+| `console.node.id_mismatch` | the node is observed reporting a `straum_node` ≠ its configured id, and has not reported that id before in this epoch. Once per epoch per node and reported id (at most 16 ids per node per epoch), whatever the node's state in round k−1 | the node | `{"configured", "reported"}` |
 | `console.collector.overrun` | a poll tick was skipped: the round started at least two intervals after the previous one (the console itself stalled; a node's request cannot cause it, its timeout is under half the interval) | null | `{"skipped"}` |
 | `cluster.max_slot.changed` | `cluster.max_slot` changed, and the same nodes were observed in both rounds | null | `{"from", "to"}` |
 | `cluster.leading.changed` | `cluster.leading` differs from round k−1, and the same nodes were observed in both rounds | null | `{"from", "to", "max_slot"}` |
@@ -212,8 +221,11 @@ core has no restart marker among its stable series.
 
 ### `gap`
 
-On `GET /api/v1/stream`, a reconnect with `Last-Event-ID` that cannot be
-served gets, after the first state:
+A stream starts with `retry: 2000` and the latest state (before the first
+round has closed, the state comes with the first round). On a reconnect,
+the browser sends back the last `<epoch>/<id>` it saw as `Last-Event-ID`:
+the events after it follow the state if they are still in memory.
+Otherwise the stream sends, after the state:
 
 ```json
 { "schema_version": 1, "epoch": "9f2c4e1ab07d5e33", "reason": "evicted", "since_id": 1742 }
@@ -222,6 +234,9 @@ served gets, after the first state:
 | `reason` | Meaning |
 |---|---|
 | `evicted` | Events after `since_id` are no longer in the console's memory. |
-| `console_restarted` | `since_id` is from another epoch. |
+| `console_restarted` | `Last-Event-ID` is from another epoch, or not of the form `<epoch>/<id>`. |
 
-`state` messages carry no `id:`, so they never move `Last-Event-ID`.
+`state` messages carry no `id:`, so they never move `Last-Event-ID`. A
+client that cannot keep up (32 messages queued) is disconnected, never
+waited for; it reconnects and resumes from its `Last-Event-ID`. At most 64
+streams are open at once; beyond that the stream answers 503.

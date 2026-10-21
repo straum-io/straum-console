@@ -4,13 +4,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net"
 	"os"
 	"os/exec"
-	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -105,25 +104,75 @@ func (c *cluster) stop(i int) {
 	}
 }
 
-// await runs rounds, one per interval, until ok holds or the deadline.
-func await(t *testing.T, col *collector, within time.Duration, what string, ok func(state) bool) state {
+// console runs the whole program against the cluster on a free loopback
+// port and returns its base URL; it stops with the test.
+func (c *cluster) console(t *testing.T) string {
+	t.Helper()
+	var spec []string
+	for _, n := range c.cfg.nodes {
+		spec = append(spec, fmt.Sprintf("%d=%s", n.id, n.addr))
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ready := make(chan string, 1)
+	exited := make(chan int, 1)
+	go func() {
+		exited <- run(ctx, []string{"--node", strings.Join(spec, ","), "--interval", "1s", "--listen", "127.0.0.1:0"}, nil, os.Stderr, ready)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		if code := <-exited; code != 0 {
+			t.Errorf("console exited %d", code)
+		}
+	})
+	select {
+	case addr := <-ready:
+		return "http://" + addr
+	case code := <-exited:
+		t.Fatalf("console exited %d before listening", code)
+	}
+	return ""
+}
+
+// awaitState polls GET /api/v1/state until ok holds.
+func awaitState(t *testing.T, url string, within time.Duration, what string, ok func(state) bool) state {
 	t.Helper()
 	deadline := time.Now().Add(within)
 	for {
-		s, _ := col.round(context.Background())
-		if ok(s) {
+		var s state
+		if code, body, _ := get(t, url+"/api/v1/state"); code == 200 && json.Unmarshal([]byte(body), &s) == nil && ok(s) {
 			return s
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("%s: not within %s; last state %+v", what, within, s)
+			t.Fatalf("%s: not within %s", what, within)
 		}
-		time.Sleep(col.cfg.interval)
+		time.Sleep(200 * time.Millisecond)
 	}
+}
+
+// awaitEvent reads the stream until an event named name arrives.
+func awaitEvent(t *testing.T, s *sse, name string) event {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		f := s.next(t)
+		if f["event"] != "event" {
+			continue
+		}
+		var e event
+		if err := json.Unmarshal([]byte(f["data"]), &e); err != nil {
+			t.Fatal(err)
+		}
+		if e.Name == name {
+			return e
+		}
+	}
+	t.Fatalf("no %s within 20s", name)
+	return event{}
 }
 
 func TestE2E(t *testing.T) {
 	c := startCluster(t)
-	col := newCollector(c.cfg, slog.New(slog.NewTextHandler(os.Stderr, nil)))
+	url := c.console(t)
 	allServing := func(s state) bool {
 		serving := 0
 		for _, n := range s.Nodes {
@@ -131,7 +180,7 @@ func TestE2E(t *testing.T) {
 		}
 		return s.Cluster.Observed == 3 && serving == 3 && len(s.Cluster.Leading) == 1
 	}
-	s := await(t, col, 20*time.Second, "cluster up", allServing)
+	s := awaitState(t, url, 20*time.Second, "cluster up", allServing)
 
 	// leading names the node that reports straum_leading = 1, in the same round.
 	leader := s.Cluster.Leading[0]
@@ -143,32 +192,33 @@ func TestE2E(t *testing.T) {
 			t.Errorf("node %d answered for another: %+v", i, n)
 		}
 	}
+	stream := openStream(t, url, "")
 
-	// A killed node is unknown in the next round (within one interval plus
-	// the timeout), with its last values kept.
+	// A killed node: unreachable on the stream, unknown with its last values.
 	down := (leader + 1) % 3
 	c.stop(down)
-	time.Sleep(col.cfg.interval)
-	s, _ = col.round(context.Background())
-	if n := s.Nodes[down]; n.State != metrics.Unknown || n.Last == nil || n.Last.Metrics["straum_node"] != uint64(down) {
+	if e := awaitEvent(t, stream, "console.node.unreachable"); e.Node == nil || *e.Node != down {
+		t.Fatalf("unreachable: %+v", e)
+	}
+	s = awaitState(t, url, 5*time.Second, "killed node unknown", func(s state) bool { return s.Nodes[down].State == metrics.Unknown })
+	if n := s.Nodes[down]; n.Last == nil || n.Last.Metrics["straum_node"] != uint64(down) || s.Cluster.Observed != 2 {
 		t.Fatalf("killed node %d: %+v", down, n)
 	}
-	if s.Cluster.Observed != 2 {
-		t.Errorf("observed = %d", s.Cluster.Observed)
-	}
 
-	// Restarted, it is observed again.
+	// Restarted: reachable again.
 	c.start(down)
-	await(t, col, 20*time.Second, "restarted node observed", allServing)
+	if e := awaitEvent(t, stream, "console.node.reachable"); *e.Node != down {
+		t.Fatalf("reachable: %+v", e)
+	}
+	awaitState(t, url, 20*time.Second, "restarted node serving", allServing)
 
 	// A handoff (SIGUSR1 to the leader) moves leading to another node.
 	if err := c.procs[leader].Process.Signal(syscall.SIGUSR1); err != nil {
 		t.Fatal(err)
 	}
-	s = await(t, col, 20*time.Second, "leading moves after handoff", func(s state) bool {
-		return len(s.Cluster.Leading) == 1 && s.Cluster.Leading[0] != leader
-	})
-	if slices.Contains(s.Cluster.Leading, leader) {
-		t.Fatalf("leading = %v", s.Cluster.Leading)
+	e := awaitEvent(t, stream, "cluster.leading.changed")
+	to, _ := e.Data["to"].([]any)
+	if len(to) != 1 || int(to[0].(float64)) == leader {
+		t.Fatalf("leading.changed: %+v", e)
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"time"
+	"unicode/utf8"
 
 	"github.com/straum-io/straum-cli/metrics"
 )
@@ -39,6 +40,20 @@ type observation struct {
 	Metrics    map[string]uint64 `json:"metrics"`
 }
 
+const maxError = 256
+
+// truncate cuts s to at most max bytes, on a character boundary.
+func truncate(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	cut := max - len("…")
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…"
+}
+
 // nextState builds round prev.Round+1 from one report, whose nodes are in
 // configuration order. prev carries the last observations forward.
 func nextState(prev state, r metrics.Report, cfg config) state {
@@ -51,6 +66,9 @@ func nextState(prev state, r metrics.Report, cfg config) state {
 		Cluster:       clusterView{Configured: len(cfg.nodes), Leading: []int{}},
 	}
 	for i, n := range r.Nodes {
+		// An error can quote the node's own bytes (up to its whole body):
+		// capped here, so neither the state nor an event holds more.
+		n.Error = truncate(n.Error, maxError)
 		ns := nodeState{ID: cfg.nodes[i].id, Node: n}
 		if n.State == metrics.Observed {
 			s.Cluster.Observed++

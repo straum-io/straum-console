@@ -5,23 +5,24 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
-	"slices"
 	"time"
 
 	"github.com/straum-io/straum-cli/metrics"
 )
 
-// collector polls every configured node once per interval. Browsers never
-// cause a poll, and nothing but GET /metrics is ever sent (ECO-D-11 A).
+// collector polls every configured node once per interval and publishes
+// each round to the hub. Browsers never cause a poll, and nothing but
+// GET /metrics is ever sent (ECO-D-11 A).
 type collector struct {
 	cfg    config
 	client metrics.Client
 	addrs  []string
 	log    *slog.Logger
+	hub    *hub
 	state  state
 	// The ids each node has reported against its configuration, this epoch.
 	misreported map[int]map[uint64]bool
-	// Ticks skipped because a round started late, this epoch.
+	// Ticks skipped since the last round, raised with the next one.
 	skipped int
 }
 
@@ -30,8 +31,9 @@ func newCollector(cfg config, log *slog.Logger) *collector {
 	for _, n := range cfg.nodes {
 		addrs = append(addrs, n.addr)
 	}
-	var epoch [8]byte
-	rand.Read(epoch[:])
+	var b [8]byte
+	rand.Read(b[:])
+	epoch := hex.EncodeToString(b[:])
 	return &collector{
 		cfg: cfg,
 		// Below the interval, so the requests of a round end before the next
@@ -39,7 +41,8 @@ func newCollector(cfg config, log *slog.Logger) *collector {
 		client:      metrics.Client{Timeout: min(time.Second, cfg.interval/2)},
 		addrs:       addrs,
 		log:         log,
-		state:       state{Epoch: hex.EncodeToString(epoch[:])},
+		hub:         newHub(epoch),
+		state:       state{Epoch: epoch},
 		misreported: map[int]map[uint64]bool{},
 	}
 }
@@ -47,16 +50,24 @@ func newCollector(cfg config, log *slog.Logger) *collector {
 // round asks every node once. Collect returns when each has answered or
 // timed out, which closes the round. A round cut short by ctx is dropped,
 // so shutting down never marks a node unknown.
-func (c *collector) round(ctx context.Context) (state, bool) {
+func (c *collector) round(ctx context.Context) (state, []event, bool) {
 	r, err := c.client.Collect(ctx, c.addrs)
 	if err != nil || ctx.Err() != nil {
 		// err is only a bad address or timeout, both refused by parseConfig.
-		return c.state, false
+		return c.state, nil, false
 	}
 	next := nextState(c.state, r, c.cfg)
-	c.logChanges(c.state, next)
-	c.state = next
-	return next, true
+	evs := c.hub.publish(next, deriveEvents(c.state, next, c.skipped, c.misreported))
+	if c.state.Round == 0 {
+		for _, n := range next.Nodes {
+			c.log.Info("first round", "id", n.ID, "address", n.Address, "state", n.State, "error", n.Error)
+		}
+	}
+	for _, e := range evs {
+		c.log.Info("event", "id", e.ID, "name", e.Name, "node", e.Node, "data", e.Data)
+	}
+	c.state, c.skipped = next, 0
+	return next, evs, true
 }
 
 // run polls until ctx ends: one round now, then one per tick.
@@ -66,10 +77,7 @@ func (c *collector) run(ctx context.Context) {
 	var last time.Time
 	for {
 		start := time.Now()
-		if n := missedTicks(last, start, c.cfg.interval); n > 0 {
-			c.skipped += n
-			c.log.Warn("ticks skipped", "skipped", n, "total", c.skipped)
-		}
+		c.skipped += missedTicks(last, start, c.cfg.interval)
 		last = start
 		c.round(ctx)
 		select {
@@ -89,35 +97,4 @@ func missedTicks(prev, now time.Time, interval time.Duration) int {
 		return 0
 	}
 	return max(0, int(now.Sub(prev)/interval)-1)
-}
-
-// logChanges logs each transition once, never each poll.
-func (c *collector) logChanges(prev, next state) {
-	for i, n := range next.Nodes {
-		var was nodeState
-		if i < len(prev.Nodes) {
-			was = prev.Nodes[i]
-		}
-		attrs := []any{"id", n.ID, "address", n.Address}
-		if n.State != was.State {
-			if n.State == metrics.Observed {
-				c.log.Info("node observed", attrs...)
-			} else {
-				c.log.Warn("node unknown", append(attrs, "error", n.Error)...)
-			}
-		}
-		// The console reports a wrong id, once per node and id; it does not
-		// correct it.
-		reported, ok := n.Metrics["straum_node"]
-		if ok && reported != uint64(n.ID) && !c.misreported[n.ID][reported] {
-			if c.misreported[n.ID] == nil {
-				c.misreported[n.ID] = map[uint64]bool{}
-			}
-			c.misreported[n.ID][reported] = true
-			c.log.Warn("node reports another id", append(attrs, "reported", reported)...)
-		}
-	}
-	if !slices.Equal(prev.Cluster.Leading, next.Cluster.Leading) {
-		c.log.Info("nodes reporting leading", "leading", next.Cluster.Leading, "observed", next.Cluster.Observed)
-	}
 }
