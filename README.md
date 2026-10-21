@@ -13,7 +13,7 @@ how old it is.
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="docs/assets/overview-light.png">
-  <img src="docs/assets/overview-dark.png" alt="The Overview screen of a three-node cluster on one machine: two nodes observed, node 0 reporting leading; node 2 unknown after it was stopped, its last values dimmed with their age; recent events: node 2 unreachable, a leading change after a handoff, the highest slot changing">
+  <img src="docs/assets/overview-dark.png" alt="The Overview of a three-node cluster on one machine: node 1 reports leading, node 2 is unknown after it was stopped and keeps its last values dimmed with their age; recent events: node 2 unreachable, a marker where the console restarted, then a leading change after a handoff and the highest slot changing">
 </picture>
 
 ## Why

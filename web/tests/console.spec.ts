@@ -345,3 +345,18 @@ test('search finds events by name and node', async ({ page }) => {
 	await page.locator('#search').fill('no such event anywhere');
 	await expect(page.locator('main')).toContainText('No event matches the filter.');
 });
+
+test('no page is wider than the window, and the help dialog sits in the middle', async ({ page }) => {
+	// Narrow enough that the widest table does not fit: it must scroll, not the page.
+	await page.setViewportSize({ width: 1024, height: 720 });
+	for (const path of ['', 'cluster', 'durability', 'events', 'config', 'not-exposed']) {
+		await page.goto(`${base}/#/${path}`);
+		await page.reload(); // a hash change alone keeps the old page
+		await expect(page.locator('.pill.live')).toBeVisible();
+		const [scroll, inner] = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
+		expect(scroll, `#/${path}`).toBeLessThanOrEqual(inner);
+	}
+	await page.keyboard.press('?');
+	const box = (await page.locator('dialog#keys').boundingBox())!;
+	expect(Math.abs(box.x + box.width / 2 - 512)).toBeLessThan(20);
+});
