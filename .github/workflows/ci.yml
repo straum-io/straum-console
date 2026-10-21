@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make check
+
+  # A real three-node cluster built from the core's main branch. The core
+  # is public, so the checkout needs no token.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: console
+      - uses: actions/checkout@v4
+        with:
+          repository: straum-io/straum
+          path: straum
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: console/go.mod
+          cache-dependency-path: console/go.sum
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: straum
+      - run: make e2e
+        working-directory: console
