@@ -1,0 +1,67 @@
+name: image
+
+# The container image (CON-D-6 A) goes out only when a person publishes a
+# release, never on a tag push alone. It is built from that release's own
+# linux archives, checked against its checksums.txt, so the image carries the
+# attested binary. Repository settings:
+#   variable DOCKERHUB_NAMESPACE  the Docker Hub user or organization
+#   secrets  DOCKERHUB_USERNAME, DOCKERHUB_TOKEN (an access token with write scope)
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+      NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Settings
+        run: '[ -n "$NAMESPACE" ] || { echo "image: set the DOCKERHUB_NAMESPACE variable" >&2; exit 1; }'
+      - name: The release's linux archives, checked
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p rel && cd rel
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p 'straum-console_*_linux_*.tar.gz' -p checksums.txt
+          sha256sum --ignore-missing -c checksums.txt
+          for arch in amd64 arm64; do
+            mkdir -p "../image/linux-$arch"
+            tar -xzf straum-console_*_linux_"$arch".tar.gz -C "../image/linux-$arch" straum-console
+          done
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ vars.DOCKERHUB_NAMESPACE }}/straum-console
+          # X.Y.Z and X.Y; latest only for a release that is not a prerelease.
+          tags: |
+            type=semver,pattern={{version}},value=${{ github.event.release.tag_name }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ github.event.release.tag_name }}
+          flavor: |
+            latest=${{ !github.event.release.prerelease }}
+          labels: |
+            org.opencontainers.image.title=straum-console
+            org.opencontainers.image.description=Read-only web console for a Straum cluster (experimental)
+            org.opencontainers.image.licenses=Apache-2.0
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true

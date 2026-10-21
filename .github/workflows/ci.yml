@@ -39,6 +39,41 @@ jobs:
       - run: cd web && npx playwright install --with-deps chromium
       - run: make web-test
 
+  # The image from source, run with the host's network against a fixture
+  # node: the console answers on the host's loopback and observes the node.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make image ARCH=amd64
+      - name: Run it with --network host
+        run: |
+          mkdir -p fixture && cp testdata/node0.prom fixture/metrics
+          python3 -m http.server 19100 --bind 127.0.0.1 --directory fixture &
+          docker run -d --name console --network host straum-console:dev --node 0=127.0.0.1:19100 --listen 127.0.0.1:18080 --interval 1s
+          for i in $(seq 1 20); do
+            curl -fs 127.0.0.1:18080/api/v1/state | grep -q '"observed":1' && { echo ok; exit 0; }
+            sleep 0.5
+          done
+          docker logs console; curl -s 127.0.0.1:18080/api/v1/state; exit 1
+
+  # install.sh and uninstall.sh against a local release snapshot.
+  install:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make release-snapshot
+      - run: make install-test
+
   # A real three-node cluster built from the core's main branch. The core
   # is public, so the checkout needs no token.
   e2e:
