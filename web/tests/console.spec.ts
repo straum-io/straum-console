@@ -5,7 +5,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { connect, createServer as createNetServer, type AddressInfo, type Socket } from 'node:net';
 
 const root = new URL('../../', import.meta.url).pathname;
 const consolePort = 18180;
@@ -82,7 +82,7 @@ test.afterEach(() => {
 	expect(seen).toEqual([]);
 });
 
-async function open(page: Page, path = '/') {
+async function open(page: Page, path = '/', at = base) {
 	await page.exposeFunction('reportViolation', (v: string) => problems.push(v));
 	await page.addInitScript(() =>
 		document.addEventListener('securitypolicyviolation', (e) =>
@@ -90,7 +90,7 @@ async function open(page: Page, path = '/') {
 		),
 	);
 	page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
-	await page.goto(base + path);
+	await page.goto(at + path);
 	await expect(page.locator('.pill.live')).toBeVisible();
 }
 
@@ -199,4 +199,66 @@ test('not exposed lists what is missing and what would provide it', async ({ pag
 		await expect(page.locator(`tbody[data-screen="${screen}"]`)).toContainText(row!);
 	}
 	await expect(page.locator('table.not-exposed')).toContainText('straum#32');
+});
+
+/**
+ * A TCP proxy in front of the console, so a test can cut the browser's
+ * network for real: every open connection closed, new ones refused.
+ * (Playwright's offline mode leaves an open EventSource connected.)
+ */
+async function proxy(target: number) {
+	let cut = false;
+	const sockets = new Set<Socket>();
+	const server = createNetServer((client) => {
+		if (cut) return client.destroy();
+		const upstream = connect(target, '127.0.0.1');
+		sockets.add(client).add(upstream);
+		client.pipe(upstream).pipe(client);
+		const drop = () => {
+			client.destroy();
+			upstream.destroy();
+			sockets.delete(client);
+			sockets.delete(upstream);
+		};
+		client.on('error', drop).on('close', drop);
+		upstream.on('error', drop).on('close', drop);
+	});
+	await new Promise<void>((ok) => server.listen(0, '127.0.0.1', ok));
+	return {
+		url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+		cut() {
+			cut = true;
+			for (const s of sockets) s.destroy();
+		},
+		restore() {
+			cut = false;
+		},
+		close: () => server.close(),
+	};
+}
+
+test('after a 10 s network cut, the events missed are replayed, not lost', async ({ page }) => {
+	const net = await proxy(consolePort);
+	try {
+		await open(page, '/#/events', net.url);
+		await expect(page.locator('h1')).toHaveText('Events');
+		// The newest event the console has before the cut.
+		const before = ((await (await fetch(`${base}/api/v1/events`)).json()) as { events: { id: number }[] }).events.at(-1)?.id ?? 0;
+		net.cut();
+		nodes[2]!.down = true; // an event while the browser cannot hear it
+		// The cut is real: the stream stops, so the view goes not current.
+		await expect(page.locator('.app')).toHaveClass(/not-current/, { timeout: 8000 });
+		await page.waitForTimeout(10_000);
+		net.restore();
+		await expect(page.locator('.pill.live')).toBeVisible({ timeout: 20_000 });
+		// The event raised during the cut, not an older one of the same name.
+		const missed = page.locator('table.events tr[data-name="console.node.unreachable"][data-node="2"]');
+		await expect
+			.poll(async () => Math.max(0, ...(await missed.evaluateAll((rows) => rows.map((r) => Number(r.getAttribute('data-id')))))))
+			.toBeGreaterThan(before);
+		await expect(page.locator('tr.gap')).toHaveCount(0); // replayed, so no gap
+	} finally {
+		nodes[2]!.down = false;
+		net.close();
+	}
 });

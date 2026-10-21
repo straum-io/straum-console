@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -27,16 +26,6 @@ type cluster struct {
 	logs  []*os.File
 	procs []*exec.Cmd
 	cfg   config
-}
-
-func freeAddr(t *testing.T) string {
-	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer l.Close()
-	return l.Addr().String()
 }
 
 // startCluster starts the nodes; STRAUM_SERVER_BIN is the core's binary
@@ -116,7 +105,7 @@ func (c *cluster) console(t *testing.T) string {
 	ready := make(chan string, 1)
 	exited := make(chan int, 1)
 	go func() {
-		exited <- run(ctx, []string{"--node", strings.Join(spec, ","), "--interval", "1s", "--listen", "127.0.0.1:0"}, nil, os.Stderr, ready)
+		exited <- run(ctx, []string{"--node", strings.Join(spec, ","), "--interval", "1s", "--listen", "127.0.0.1:0"}, nil, os.Stdout, os.Stderr, ready)
 	}()
 	t.Cleanup(func() {
 		cancel()
@@ -221,4 +210,55 @@ func TestE2E(t *testing.T) {
 	if len(to) != 1 || int(to[0].(float64)) == leader {
 		t.Fatalf("leading.changed: %+v", e)
 	}
+}
+
+// TestE2EFailures runs plan §15's failure modes against a real cluster: the
+// leader killed outright (a takeover), and a node frozen with SIGSTOP (its
+// scrape times out) and thawed.
+func TestE2EFailures(t *testing.T) {
+	c := startCluster(t)
+	url := c.console(t)
+	allServing := func(s state) bool {
+		serving := 0
+		for _, n := range s.Nodes {
+			serving += int(n.Metrics["straum_serving"])
+		}
+		return s.Cluster.Observed == 3 && serving == 3 && len(s.Cluster.Leading) == 1
+	}
+	s := awaitState(t, url, 20*time.Second, "cluster up", allServing)
+	leader := s.Cluster.Leading[0]
+	stream := openStream(t, url, "")
+
+	// kill -9 the leader: it is unreachable at once, and another node takes
+	// over. leading never names a node whose latest reading is not leading=1.
+	if err := c.procs[leader].Process.Signal(syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	c.procs[leader].Wait()
+	c.procs[leader] = nil
+	if e := awaitEvent(t, stream, "console.node.unreachable"); *e.Node != leader {
+		t.Fatalf("unreachable: %+v", e)
+	}
+	s = awaitState(t, url, 30*time.Second, "takeover", func(s state) bool {
+		return len(s.Cluster.Leading) == 1 && s.Cluster.Leading[0] != leader
+	})
+	newLeader := s.Cluster.Leading[0]
+	if s.Nodes[newLeader].Metrics["straum_leading"] != 1 || s.Nodes[leader].State != metrics.Unknown {
+		t.Fatalf("after the takeover: %+v", s)
+	}
+
+	// Freeze a follower: its scrape times out, so it is unknown with the
+	// timeout as the reason; thawed, it is observed again.
+	frozen := 3 - leader - newLeader
+	if err := c.procs[frozen].Process.Signal(syscall.SIGSTOP); err != nil {
+		t.Fatal(err)
+	}
+	s = awaitState(t, url, 10*time.Second, "frozen node unknown", func(s state) bool { return s.Nodes[frozen].State == metrics.Unknown })
+	if !strings.Contains(s.Nodes[frozen].Error, "no answer within") {
+		t.Errorf("frozen node's reason: %q", s.Nodes[frozen].Error)
+	}
+	if err := c.procs[frozen].Process.Signal(syscall.SIGCONT); err != nil {
+		t.Fatal(err)
+	}
+	awaitState(t, url, 20*time.Second, "thawed node observed", func(s state) bool { return s.Nodes[frozen].State == metrics.Observed })
 }

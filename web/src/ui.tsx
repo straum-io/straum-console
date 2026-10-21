@@ -146,7 +146,7 @@ export function EventRows({ list }: { list: Entry[] }) {
 							</td>
 						</tr>
 					) : (
-						<tr key={`${x.event.epoch}/${x.event.id}`} title={JSON.stringify(x.event.data)}>
+						<tr key={`${x.event.epoch}/${x.event.id}`} data-id={x.event.id} data-name={x.event.name} data-node={x.event.node ?? ''} title={JSON.stringify(x.event.data)}>
 							<td class="t">{clock(x.event.at)}</td>
 							<td class="n">{x.event.name}</td>
 							<td>{describe(x.event)}</td>

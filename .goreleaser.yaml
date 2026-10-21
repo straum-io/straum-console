@@ -1,0 +1,37 @@
+# Release builds: six platforms, from a pushed v* tag (.github/workflows/release.yml).
+# The release is created as a draft: a person reads it and publishes it.
+# web/dist is committed, so the build needs no Node.
+version: 2
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .ShortCommit }}
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+      - docs/straum-console.service
+
+checksum:
+  name_template: checksums.txt
+
+# What changed is written by hand in CHANGELOG.md, not generated from commits.
+changelog:
+  disable: true
+
+release:
+  draft: true
+  footer: |
+    See [CHANGELOG.md](https://github.com/straum-io/straum-console/blob/{{ .Tag }}/CHANGELOG.md).
+    Straum is experimental and not production-ready, and so is this console.

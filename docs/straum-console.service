@@ -1,0 +1,30 @@
+# An example systemd unit for straum-console. Adjust the nodes and paths.
+#
+# The STRAUM_CONSOLE_* variables belong to the console only. Never put them
+# in a straum server's environment or env file: the server refuses any
+# STRAUM_* variable it does not know, and will not start.
+#
+# The console listens on loopback only (it has no authentication). Open it
+# from another machine with: ssh -L 8080:127.0.0.1:8080 <this-host>
+
+[Unit]
+Description=straum-console, a read-only web console for a Straum cluster
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/straum-console
+Environment=STRAUM_CONSOLE_NODES=0=127.0.0.1:9100,1=127.0.0.1:9101,2=127.0.0.1:9102
+Environment=STRAUM_CONSOLE_LISTEN=127.0.0.1:8080
+Restart=on-failure
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

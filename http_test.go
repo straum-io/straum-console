@@ -4,12 +4,23 @@ import (
 	"bufio"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
+
+func freeAddr(t *testing.T) string {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	return l.Addr().String()
+}
 
 func serveHub(t *testing.T, h *hub) string {
 	t.Helper()
@@ -317,5 +328,23 @@ func TestFrontend(t *testing.T) {
 	}
 	if code, _, _ := get(t, url+"/app.js"); code != 200 {
 		t.Errorf("app.js: %d", code)
+	}
+}
+
+func TestDebugRoutes(t *testing.T) {
+	srv := httptest.NewServer(debugRoutes())
+	t.Cleanup(srv.Close)
+	if code, body, _ := get(t, srv.URL+"/debug/pprof/heap?debug=1"); code != 200 || !strings.Contains(body, "HeapInuse") {
+		t.Errorf("heap profile: %d", code)
+	}
+	req, _ := http.NewRequest("GET", srv.URL+"/debug/pprof/", nil)
+	req.Host = "evil.example"
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusMisdirectedRequest {
+		t.Errorf("foreign Host: %d", resp.StatusCode)
 	}
 }

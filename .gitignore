@@ -39,3 +39,6 @@ bin/
 web/node_modules/
 web/test-results/
 web/playwright-report/
+
+# Release archives (make release-snapshot)
+/dist/

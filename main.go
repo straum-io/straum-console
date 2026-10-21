@@ -11,21 +11,29 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
+)
+
+// version and commit are set at build time (-ldflags -X main.version=…).
+var (
+	version = "dev"
+	commit  = "unknown"
 )
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	os.Exit(run(ctx, os.Args[1:], os.Environ(), os.Stderr, nil))
+	os.Exit(run(ctx, os.Args[1:], os.Environ(), os.Stdout, os.Stderr, nil))
 }
 
 // run serves until ctx ends. ready, if not nil, gets the address listened
 // on once the listener is open.
-func run(ctx context.Context, args, environ []string, stderr io.Writer, ready chan<- string) int {
+func run(ctx context.Context, args, environ []string, stdout, stderr io.Writer, ready chan<- string) int {
 	cfg, err := parseConfig(args, environ, stderr)
 	if errors.Is(err, flag.ErrHelp) {
 		return 0
@@ -33,6 +41,10 @@ func run(ctx context.Context, args, environ []string, stderr io.Writer, ready ch
 	if err != nil {
 		fmt.Fprintln(stderr, "straum-console:", err)
 		return 2
+	}
+	if cfg.version {
+		fmt.Fprintf(stdout, "straum-console %s (commit %s, %s)\n", version, commit, runtime.Version())
+		return 0
 	}
 	log := slog.New(slog.NewJSONHandler(stderr, nil))
 	ln, err := net.Listen("tcp", cfg.listen)
@@ -44,7 +56,18 @@ func run(ctx context.Context, args, environ []string, stderr io.Writer, ready ch
 	srv := newServer(c.hub)
 	served := make(chan error, 1)
 	go func() { served <- srv.Serve(ln) }()
-	log.Info("serving", "listen", ln.Addr().String(), "nodes", len(cfg.nodes), "interval", cfg.interval.String())
+	log.Info("serving", "version", version, "listen", ln.Addr().String(), "nodes", len(cfg.nodes), "interval", cfg.interval.String())
+	if cfg.debugListen != "" {
+		dln, err := net.Listen("tcp", cfg.debugListen)
+		if err != nil {
+			fmt.Fprintln(stderr, "straum-console:", err)
+			return 1
+		}
+		debug := &http.Server{Handler: debugRoutes(), ReadHeaderTimeout: 5 * time.Second}
+		go debug.Serve(dln)
+		defer debug.Close()
+		log.Info("debug listener", "listen", dln.Addr().String())
+	}
 	if ready != nil {
 		ready <- ln.Addr().String()
 	}
