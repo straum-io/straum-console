@@ -4,13 +4,14 @@ A web console for [Straum](https://github.com/straum-io/straum) clusters:
 every node on one screen, with each value showing where it came from and
 how old it is.
 
-> **Status: early.** The backend reads the nodes and serves the
-> read-only JSON API on loopback; the web pages are not built yet. The
-> picture below is a design mockup, not a screenshot.
+> **Status: early.** It reads the nodes and shows them on three pages
+> (Overview, Cluster & Leader, Events), served with a read-only JSON API on
+> loopback. Replication, configuration and what the broker does not expose
+> come next. Experimental, like the broker.
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="docs/assets/overview-light.png">
-  <img src="docs/assets/overview-dark.png" alt="Design mockup of the Overview screen: three node cards, two observed and one unknown with its last values and their age, and a list of recent events">
+  <img src="docs/assets/overview-dark.png" alt="The Overview screen of a three-node cluster on one machine: two nodes observed, node 0 reporting leading; node 2 unknown after it was stopped, its last values dimmed with their age; recent events: node 2 unreachable, a leading change after a handoff, the highest slot changing">
 </picture>
 
 ## Why
@@ -61,7 +62,8 @@ where the nodes set `STRAUM_CLUSTER_UNAUTHENTICATED_NETWORK=1`, on the
 broker's own terms.
 
 The console polls every 2 s (`--interval`) and serves on `127.0.0.1:8080`
-(`--listen`, loopback only):
+(`--listen`, loopback only): open http://localhost:8080. The same data is
+JSON:
 
 ```sh
 curl -s localhost:8080/api/v1/state      # every node, as last read
@@ -76,7 +78,10 @@ flags; never put them in a straum server's environment, which refuses
 unknown `STRAUM_*` variables.
 
 `make check` runs the linters and tests; `make e2e` runs a real
-three-node cluster built from a core checkout at `../straum`.
+three-node cluster built from a core checkout at `../straum`. The web pages
+are Preact in TypeScript under `web/`; the built files in `web/dist` are
+committed, so `go build` needs no Node. After changing `web/src`, run
+`make web` (Node 22) and `make web-test` (Playwright).
 
 ## More
 

@@ -299,3 +299,23 @@ func TestHeadStreamTakesNoSlot(t *testing.T) {
 	}
 	openStream(t, url, "").next(t) // the one slot is still free
 }
+
+func TestFrontend(t *testing.T) {
+	url := serveHub(t, newHub("e1"))
+	code, body, hdr := get(t, url+"/")
+	if code != 200 || !strings.Contains(body, `<script type="module" src="/app.js">`) || hdr.Get("Cache-Control") != "no-cache" {
+		t.Fatalf("/: %d %q %v", code, hdr.Get("Cache-Control"), body)
+	}
+	if !strings.Contains(hdr.Get("Content-Security-Policy"), "default-src 'self'") {
+		t.Errorf("CSP on the page: %q", hdr.Get("Content-Security-Policy"))
+	}
+	if code, _, hdr := get(t, url+"/fonts/inter-v20.woff2"); code != 200 || !strings.Contains(hdr.Get("Cache-Control"), "immutable") {
+		t.Errorf("font: %d %q", code, hdr.Get("Cache-Control"))
+	}
+	if code, body, _ := get(t, url+"/licenses.txt"); code != 200 || !strings.Contains(body, "preact") {
+		t.Errorf("licences: %d", code)
+	}
+	if code, _, _ := get(t, url+"/app.js"); code != 200 {
+		t.Errorf("app.js: %d", code)
+	}
+}

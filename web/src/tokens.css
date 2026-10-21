@@ -1,0 +1,42 @@
+/* Brand tokens shared by the landing page, the docs and, later, straum-console.
+   Dark is the default; light follows Starlight's data-theme attribute. */
+:root {
+	--st-bg: #070a0f;
+	--st-bg-2: #0d121a;
+	--st-bg-3: #141b26;
+	--st-text: #e8edf4;
+	--st-text-2: #9aa6b8;
+	--st-border: #1e2733;
+	--st-accent: #22e4ff;
+	--st-accent-2: #3d7bff;
+	--st-accent-3: #8b5cf6;
+	--st-accent-ink: #04121a;
+	--st-accent-soft: rgba(34, 228, 255, 0.1);
+	--st-glow: rgba(34, 228, 255, 0.35);
+	--st-gradient: linear-gradient(100deg, var(--st-accent) 0%, var(--st-accent-2) 55%, var(--st-accent-3) 100%);
+	--st-code-bg: #05080c;
+	--st-success: #10b981;
+	--st-warning: #fbbf24;
+	--st-danger: #f43f5e;
+	--st-info: #3d7bff;
+	--st-font: 'Inter', -apple-system, 'Segoe UI', system-ui, sans-serif;
+	--st-display: 'Inter Tight', 'Inter', -apple-system, 'Segoe UI', system-ui, sans-serif;
+	--st-mono: 'JetBrains Mono', ui-monospace, Consolas, Monaco, monospace;
+	--st-radius: 4px;
+}
+:root[data-theme='light'] {
+	--st-bg: #f5f7fa;
+	--st-bg-2: #ffffff;
+	--st-bg-3: #eaeff5;
+	--st-text: #0a1220;
+	--st-text-2: #445166;
+	--st-border: #dce3ec;
+	--st-accent: #0070a8;
+	--st-accent-2: #2f5bea;
+	--st-accent-3: #7c3aed;
+	--st-accent-ink: #ffffff;
+	--st-accent-soft: rgba(0, 112, 168, 0.08);
+	--st-glow: rgba(47, 91, 234, 0.18);
+	--st-warning: #b45309;
+	--st-code-bg: #070a0f;
+}

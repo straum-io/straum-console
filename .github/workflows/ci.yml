@@ -18,6 +18,27 @@ jobs:
           go-version-file: go.mod
       - run: make check
 
+  # The frontend: the lockfile installs, the types check, web/dist is what
+  # the sources build, the bundle fits the budget, and the pages work.
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: make web
+      - name: web/dist is what the sources build
+        run: test -z "$(git status --porcelain -- web/dist)" || { git status --porcelain -- web/dist; exit 1; }
+      - run: make web-size
+      - run: cd web && npx playwright install --with-deps chromium
+      - run: make web-test
+
   # A real three-node cluster built from the core's main branch. The core
   # is public, so the checkout needs no token.
   e2e:
