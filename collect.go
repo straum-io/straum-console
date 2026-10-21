@@ -35,10 +35,8 @@ func newCollector(cfg config, log *slog.Logger) *collector {
 	rand.Read(b[:])
 	epoch := hex.EncodeToString(b[:])
 	return &collector{
-		cfg: cfg,
-		// Below the interval, so the requests of a round end before the next
-		// tick: one request in flight per node.
-		client:      metrics.Client{Timeout: min(time.Second, cfg.interval/2)},
+		cfg:         cfg,
+		client:      metrics.Client{Timeout: requestTimeout(cfg)},
 		addrs:       addrs,
 		log:         log,
 		hub:         newHub(epoch),
@@ -46,6 +44,10 @@ func newCollector(cfg config, log *slog.Logger) *collector {
 		misreported: map[int]map[uint64]bool{},
 	}
 }
+
+// requestTimeout bounds each node's request: below the interval, so the
+// requests of a round end before the next tick, one in flight per node.
+func requestTimeout(cfg config) time.Duration { return min(time.Second, cfg.interval/2) }
 
 // round asks every node once. Collect returns when each has answered or
 // timed out, which closes the round. A round cut short by ctx is dropped,

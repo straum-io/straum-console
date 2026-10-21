@@ -14,6 +14,7 @@ type state struct {
 	Round         uint64      `json:"round"`
 	GeneratedAt   time.Time   `json:"generated_at"`
 	IntervalMS    int64       `json:"interval_ms"`
+	TimeoutMS     int64       `json:"timeout_ms"`
 	Cluster       clusterView `json:"cluster"`
 	Nodes         []nodeState `json:"nodes"`
 }
@@ -63,6 +64,7 @@ func nextState(prev state, r metrics.Report, cfg config) state {
 		Round:         prev.Round + 1,
 		GeneratedAt:   r.GeneratedAt,
 		IntervalMS:    cfg.interval.Milliseconds(),
+		TimeoutMS:     requestTimeout(cfg).Milliseconds(),
 		Cluster:       clusterView{Configured: len(cfg.nodes), Leading: []int{}},
 	}
 	for i, n := range r.Nodes {

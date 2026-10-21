@@ -66,9 +66,16 @@ h3::after { content: ''; flex: 0 0 48px; height: 1px; background: var(--st-gradi
 table { width: 100%; border-collapse: collapse; background: var(--st-bg-2); border: 1px solid var(--st-border); font-size: 13px; }
 th { text-align: left; font: 500 11px var(--st-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--st-text-2); padding: 8px 12px; background: var(--st-bg-3); }
 td { padding: 7px 12px; border-top: 1px solid var(--st-border); }
-.num { text-align: right; font-family: var(--st-mono); }
+.num { text-align: right; font-family: var(--st-mono); white-space: nowrap; }
+table + h3 { margin-top: 28px; }
+table.not-exposed tr.group th { background: var(--st-bg); color: var(--st-text); font: 700 13px var(--st-display); letter-spacing: -0.01em; text-transform: none; padding-top: 14px; }
 table.events td.t { font-family: var(--st-mono); color: var(--st-text-2); white-space: nowrap; width: 1%; }
 table.events td.n { font-family: var(--st-mono); color: var(--st-accent); white-space: nowrap; width: 1%; }
+th.group { text-align: center; border-left: 1px solid var(--st-border); border-right: 1px solid var(--st-border); }
+table.durability td .tag { margin-left: 6px; }
+table.durability td .bar { margin-top: 4px; min-width: 80px; }
+.foot-note { margin-top: 12px; font-size: 12px; }
+ul.series { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 16px; list-style: none; padding: 0; font-size: 13px; }
 tr.gap td { color: var(--st-warning); font: 12px var(--st-mono); background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--st-warning) 7%, transparent) 6px 12px); }
 
 @media (max-width: 720px) {

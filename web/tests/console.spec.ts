@@ -11,17 +11,19 @@ const root = new URL('../../', import.meta.url).pathname;
 const consolePort = 18180;
 const base = `http://127.0.0.1:${consolePort}`;
 
-interface Fixture { server: Server; port: number; down: boolean; leading: number }
+interface Fixture { server: Server; port: number; down: boolean; leading: number; set: Record<string, number> }
 const nodes: Fixture[] = [];
 let consoleProc: ChildProcess | null = null;
 
 function body(i: number, f: Fixture): string {
-	return readFileSync(`${root}testdata/node${i}.prom`, 'utf8').replace(/^straum_leading \d+$/m, `straum_leading ${f.leading}`);
+	let text = readFileSync(`${root}testdata/node${i}.prom`, 'utf8').replace(/^straum_leading \d+$/m, `straum_leading ${f.leading}`);
+	for (const [k, v] of Object.entries(f.set)) text = text.replace(new RegExp(`^${k} \\d+$`, 'm'), `${k} ${v}`);
+	return text;
 }
 
 async function startNodes() {
 	for (let i = 0; i < 3; i++) {
-		const f: Fixture = { server: createServer(), port: 0, down: false, leading: i === 0 ? 1 : 0 };
+		const f: Fixture = { server: createServer(), port: 0, down: false, leading: i === 0 ? 1 : 0, set: {} };
 		f.server.on('request', (_req, res) => {
 			if (f.down) {
 				res.writeHead(500).end('down');
@@ -153,4 +155,48 @@ test('a console that goes away shows disconnected, then a gap, then recovers', a
 	await expect(page.locator('.banner')).toHaveCount(0);
 	await expect(page.locator('.app')).not.toHaveClass(/not-current/);
 	await expect(page.locator('tr.gap')).toContainText('the console restarted');
+});
+
+test('replication and durability keep local and quorum apart, and say what is computed', async ({ page }) => {
+	// Three different positions, so each derived column has one answer.
+	nodes[0]!.set = { straum_log_end: 15, straum_log_durable: 13, straum_commit: 10, straum_applied: 10 };
+	await open(page, '/#/durability');
+	await expect(page.locator('h1')).toHaveText('Replication & Durability');
+	await expect(page.locator('th.group')).toHaveText(['Local: fsync on this node', 'Quorum: majority durable, as this node knows it']);
+	const row = page.locator('table.durability tr[data-node="0"] td');
+	await expect(row.nth(2)).toHaveText('13', { timeout: 5000 }); // durable through
+	await expect(row.nth(3)).toHaveText('2'); // not yet synced: 15 − 13
+	await expect(row.nth(4)).toHaveText('10'); // commit
+	await expect(row.nth(5)).toHaveText('5'); // not yet committed: 15 − 10
+	nodes[0]!.set = {};
+	await expect(page.locator('.foot-note')).toContainText('Computed by the console');
+	await expect(page.locator('.note').first()).toContainText('ADR-0005');
+	nodes[1]!.down = true;
+	await expect(page.locator('table.durability tr[data-node="1"]')).toHaveClass(/stale/, { timeout: 5000 });
+	nodes[1]!.down = false;
+});
+
+test('configuration shows the console\'s own settings and each node\'s identity', async ({ page }) => {
+	await open(page, '/#/config');
+	await expect(page.locator('.fact', { hasText: 'between polls' })).toContainText('1.0 s');
+	await expect(page.locator('.fact', { hasText: 'to wait for each node' })).toContainText('500 ms');
+	for (const id of [0, 1, 2]) {
+		const cells = page.locator(`table.grid tr[data-node="${id}"] td`);
+		await expect(cells.nth(3)).toHaveText('matches');
+		await expect(cells.nth(4)).toHaveText('11 / 11');
+	}
+	await expect(page.locator('ul.series li')).toHaveCount(11);
+});
+
+test('not exposed lists what is missing and what would provide it', async ({ page }) => {
+	await open(page, '/#/not-exposed');
+	// The screens the stable series cannot fill are here, each with its rows.
+	for (const [screen, row] of [
+		['Throughput & Latency', 'Publish, PUBACK and delivery rates'],
+		['MQTT Gateway', 'MQTT connections'],
+		['Errors & Pressure', 'Own proposals refused at a full outbox'],
+	]) {
+		await expect(page.locator(`tbody[data-screen="${screen}"]`)).toContainText(row!);
+	}
+	await expect(page.locator('table.not-exposed')).toContainText('straum#32');
 });

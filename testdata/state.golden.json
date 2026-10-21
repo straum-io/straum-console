@@ -4,6 +4,7 @@
   "round": 1801,
   "generated_at": "2026-10-21T12:00:02.01Z",
   "interval_ms": 2000,
+  "timeout_ms": 1000,
   "cluster": {
     "configured": 3,
     "observed": 2,
