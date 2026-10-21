@@ -1,7 +1,7 @@
 # The straum core checkout, for the e2e test.
 CORE ?= ../straum
 
-.PHONY: build test lint check e2e soak bench golden web web-test web-size release-snapshot clean
+.PHONY: build test lint check e2e soak bench golden web web-test web-size release-snapshot image install-test clean
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -57,5 +57,16 @@ release-snapshot:
 	$(GORELEASER) check
 	$(GORELEASER) release --snapshot --clean
 
+# A local image from source, for this machine's CPU (Dockerfile; CON-D-6 A).
+CONTAINER ?= docker
+ARCH ?= $(shell go env GOARCH)
+image:
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -trimpath -ldflags '-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)' -o image/linux-$(ARCH)/straum-console .
+	$(CONTAINER) build --platform linux/$(ARCH) --build-arg TARGETARCH=$(ARCH) -t straum-console:dev .
+
+# install.sh and uninstall.sh against the archives of `make release-snapshot`.
+install-test:
+	scripts/test-install.sh
+
 clean:
-	rm -rf bin dist web/node_modules web/test-results
+	rm -rf bin dist image web/node_modules web/test-results

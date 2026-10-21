@@ -32,6 +32,12 @@ their own schema version (`docs/state-json.md`).
 - `--debug-listen`: `net/http/pprof` on a second loopback address, off by
   default.
 - `--version`.
+- `install.sh` and `uninstall.sh`: the release archive for this machine,
+  checked against the release's checksums, into `/usr/local`, `--prefix` or
+  `--user`; `--systemd` adds the example unit on Linux.
+- A container image, `straumio/straum-console`, built from each published
+  release's archives for linux/amd64 and linux/arm64; run it with
+  `--network host` (CON-D-6 A).
 - Release builds with GoReleaser for linux, darwin and windows, each on
   amd64 and arm64, and an example systemd unit
   (`docs/straum-console.service`).
