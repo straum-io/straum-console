@@ -71,17 +71,30 @@ alone.
 
 ## Per-round cost (`make bench`)
 
-`make bench`: 10 runs each, medians. The machine was not idle: the load
-average was 6–8 during the run (macOS background services and other
-sessions), so every result here is environment-dependent as well as
+`make bench`'s benchmarks on 2026-10-22, at revision `26ad88a` with
+straum-cli at `985ddfe` (straum-cli#21), against a test binary built with
+the previous straum-cli (`553a5c1`): the two binaries run alternately,
+`-test.count 2` each, for 5 rounds (10 runs each), medians. Go 1.26.5
+darwin/arm64, on battery. The machine was not idle (load average 2.5–5.3
+during the run), so every result here is environment-dependent as well as
 preliminary.
 
 | Benchmark | Median | Spread (max − min) | Memory per op | Class |
 |---|---|---|---|---|
-| A round's own work, 5 nodes: next state, events, one JSON encode | 13.3 µs | 6 % | 12,950 B, 145 allocations | environment-dependent |
-| The same, 15 nodes | 34.8 µs | 7 % | 36,195 B, 406 allocations | environment-dependent |
-| Publishing a round to 64 streams that keep up | 16.7 µs | 38 % | 12,037 B, 136 allocations | environment-dependent, noisy |
-| A real `Collect` of 5 nodes over loopback (HTTP and straum-cli's parsing of 16 KiB each) | 585 µs | 11 % | 559,529 B, 2,760 allocations | environment-dependent |
+| A round's own work, 5 nodes: next state, events, one JSON encode | 21.4 µs | 1 % | 12,956 B, 145 allocations | environment-dependent |
+| The same, 15 nodes | 55.6 µs | 14 % | 36,201 B, 406 allocations | environment-dependent |
+| Publishing a round to 64 streams that keep up | 27.8 µs | 42 % | 12,038 B, 136 allocations | environment-dependent, noisy |
+| A real `Collect` of 5 nodes over loopback (HTTP and straum-cli's parsing of 16 KiB each) | 556 µs | 14 % | 266,362 B, 1,457 allocations | environment-dependent |
+
+Against the previous straum-cli in the same rounds, `Collect` went from
+873 µs to 556 µs (−36 %), 548.5 KiB to 260.1 KiB (−53 %) and 2,761 to
+1,457 allocations (−47 %). The other three run code that did not change;
+benchstat still called a round of 5 nodes (+2.7 %) and of 15 (+4.2 %)
+slower, and the publishing benchmark unchanged. Those two shifts are put
+down to the machine's load, which rose during the run, not measured as
+such. The first run of this
+table (2026-10-21, a load average of 6–8) had other medians: numbers from
+different days are not comparable here.
 
 At the default interval that is one `Collect` and one round every 2 s,
 about 0.03 % of a core for that work alone. What the rest of the soak's
@@ -97,15 +110,17 @@ measured.
 | Nodes supported | 3–15 | 15 fixture nodes observed in one round (`TestFifteenNodes`); 3 real nodes (`make e2e`) | met |
 | Event payload | ≤ 1 KiB | node error text capped at 256 B where it enters the state | met by construction |
 | Event retention | 2000 events | a ring of 2000 (`TestRing`) | met |
-| Allocations per round | ≤ 1 parse buffer per node, 1 state encode | 2,762 allocations and 560 KB per `Collect` of 5 nodes | **not met** |
+| Allocations per round | ≤ 1 parse buffer per node, 1 state encode | 1,457 allocations and 266 KB per `Collect` of 5 nodes (2,761 and 560 KB before straum-cli#21) | **not met** |
 | Scrape load on a node | ≤ 0.5 req/s, ≤ 1 concurrent | 0.5 req/s at the default interval, one request per node in flight, by construction | met; the cost on the node is not measured (below) |
 | History | 1,800 rounds (1 h at 2 s), at most 15 nodes (CON-D-7 A) | a ring of 1,800 rounds allocated once (`TestHistoryRing`); 16 nodes refused at startup (`TestNodeCap`); the soak above | met |
 
 The allocations budget was written for a parser in the console. The
-parsing is straum-cli's `metrics` package (CON-D-1 A), which reads each
-body whole and builds a map of every sample. At 0.5 rounds a second that
-is about 280 KB of garbage a second, and the soak shows it does not move
-memory or CPU past their budgets. Meeting the number would be a change in
+parsing is straum-cli's `metrics` package (CON-D-1 A). Since
+straum-cli#21 it parses each response as it arrives and skips comments
+and labelled samples without allocating; it still makes a string for
+every sample it keeps. At 0.5 rounds a second that is about 130 KB of
+garbage a second, and the soak shows it does not move memory or CPU past
+their budgets. Meeting the number would be a further change in
 straum-cli, not here (straum-io/straum-cli#17).
 
 ## Failure modes (plan §15)

@@ -56,7 +56,9 @@ func TestRound(t *testing.T) {
 		{body: "oops", status: 500, error: "HTTP 500"},
 		{body: "not a metric line {", status: 200, error: "malformed"},
 		{body: strings.ReplaceAll(node0, "straum_lag 0", ""), status: 200, error: "missing stable metric straum_lag"},
-		{body: strings.Repeat("#", 2<<20), status: 200, error: "larger than"},
+		{body: strings.Repeat("# padding\n", 2<<20/10), status: 200, error: "larger than"},
+		// One line past straum-cli's 64 KiB line buffer is malformed, whatever the body's size.
+		{body: strings.Repeat("#", 2<<20), status: 200, error: "malformed"},
 	}
 	cfg := config{interval: 2 * time.Second}
 	for i, n := range nodes {
