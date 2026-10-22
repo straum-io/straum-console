@@ -293,13 +293,14 @@ test('the single-key shortcuts can be turned off, and stay off after a reload', 
 
 	const keysDoNothing = async () => {
 		const theme = await page.evaluate(() => document.documentElement.dataset['theme']);
-		for (const k of ['2', 't', '?', '/']) await page.keyboard.press(k);
+		for (const k of ['2', '6', 't', '?', '/']) await page.keyboard.press(k);
 		await expect(page.locator('h1')).toHaveText('Overview');
 		await expect(page.locator('dialog#keys')).toBeHidden();
 		await expect(page.locator('#search')).not.toBeFocused();
 		expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe(theme);
 		await expect(page.locator('nav kbd')).toHaveCount(0);
 		await expect(page.locator('#search')).not.toHaveAttribute('aria-keyshortcuts');
+		await expect(page.getByRole('button', { name: 'keyboard shortcuts' })).not.toHaveAttribute('aria-keyshortcuts');
 	};
 	await keysDoNothing();
 	await page.reload();
