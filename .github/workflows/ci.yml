@@ -1,0 +1,94 @@
+name: ci
+
+# While the repository holds no Go code (and no web/), the steps are
+# skipped and the jobs pass. The `e2e` job (a three-node cluster built from
+# straum main) went with the code; it is under the tag
+# archive/main-2026-10-23.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: hashFiles('**/*.go') != ''
+        with:
+          go-version-file: go.mod
+      - run: make check
+        if: hashFiles('**/*.go') != ''
+
+  # The frontend: the lockfile installs, the types check, web/dist is what
+  # the sources build, the bundle fits the budget, and the pages work.
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: hashFiles('web/package.json') != ''
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        if: hashFiles('web/package.json') != ''
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: make web
+        if: hashFiles('web/package.json') != ''
+      - name: web/dist is what the sources build
+        if: hashFiles('web/package.json') != ''
+        run: test -z "$(git status --porcelain -- web/dist)" || { git status --porcelain -- web/dist; exit 1; }
+      - run: make web-size
+        if: hashFiles('web/package.json') != ''
+      - run: cd web && npx playwright install --with-deps chromium
+        if: hashFiles('web/package.json') != ''
+      - run: make web-test
+        if: hashFiles('web/package.json') != ''
+
+  # The image from source, run with the host's network against a fixture
+  # node: the console answers on the host's loopback and observes the node.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: hashFiles('**/*.go') != ''
+        with:
+          go-version-file: go.mod
+      - run: make image ARCH=amd64
+        if: hashFiles('**/*.go') != ''
+      - name: Run it with --network host
+        if: hashFiles('**/*.go') != ''
+        run: |
+          mkdir -p fixture && cp testdata/node0.prom fixture/metrics
+          python3 -m http.server 19100 --bind 127.0.0.1 --directory fixture &
+          docker run -d --name console --network host straum-console:dev --node 0=127.0.0.1:19100 --listen 127.0.0.1:18080 --interval 1s
+          for i in $(seq 1 20); do
+            curl -fs 127.0.0.1:18080/api/v1/state | grep -q '"observed":1' && { echo ok; exit 0; }
+            sleep 0.5
+          done
+          docker logs console; curl -s 127.0.0.1:18080/api/v1/state; exit 1
+
+  # install.sh and uninstall.sh against a local release snapshot.
+  install:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: hashFiles('**/*.go') != ''
+        with:
+          go-version-file: go.mod
+      - run: make release-snapshot
+        if: hashFiles('**/*.go') != ''
+      - run: make install-test
+        if: hashFiles('**/*.go') != ''
