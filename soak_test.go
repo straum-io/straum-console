@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -101,6 +102,41 @@ func TestSoak(t *testing.T) {
 		}()
 	}
 
+	// Each open page fetches its charts' range once, then every 5 s the
+	// rounds since its last every 15 s, in one request (web/src/chart.tsx): 64 pages
+	// of the page with the most charts, an hour's range.
+	var historyFails atomic.Int32
+	for i := range streams {
+		go func() {
+			time.Sleep(time.Duration(i) * 15 * time.Second / streams)
+			tick := time.NewTicker(15 * time.Second)
+			defer tick.Stop()
+			var since int64
+			for {
+				url := fmt.Sprintf("http://%s/api/v1/history?series=log_end_minus_durable,log_end_minus_commit,straum_lag&range=1h&since=%d", listen, since)
+				req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+				if resp, err := http.DefaultClient.Do(req); err == nil {
+					var res struct{ Histories []historyDoc }
+					body, _ := io.ReadAll(resp.Body)
+					resp.Body.Close()
+					read.Add(int64(len(body)))
+					if resp.StatusCode != 200 || json.Unmarshal(body, &res) != nil || len(res.Histories) != 3 {
+						historyFails.Add(1)
+					} else if t := res.Histories[0].T; len(t) > 0 {
+						since = t[len(t)-1]
+					}
+				} else if ctx.Err() == nil {
+					historyFails.Add(1)
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-tick.C:
+				}
+			}
+		}()
+	}
+
 	var out *csv.Writer
 	if p := os.Getenv("SOAK_OUT"); p != "" {
 		f, err := os.Create(p)
@@ -147,6 +183,9 @@ func TestSoak(t *testing.T) {
 	}
 	if n := open.Load(); n != streams {
 		t.Errorf("%d of %d streams were still open at the end", n, streams)
+	}
+	if n := historyFails.Load(); n != 0 {
+		t.Errorf("%d history requests failed", n)
 	}
 	if cpuShare > 1 {
 		t.Errorf("CPU %.2f %% over the 1 %% budget", cpuShare)

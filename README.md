@@ -36,6 +36,10 @@ binary that runs next to the cluster.
   its address and when it was read. A node that stops answering turns
   `unknown`, and its last values stay visible with their age, never as
   current.
+- **A short history, in memory.** The last 1,800 rounds of every stable
+  series (1 h at the default 2 s), charted per node: the commit rate,
+  slot and leading, and what each node has not yet synced or committed.
+  A rate is never drawn across a gap, a restart or a leader change.
 - **No health verdict.** It reports what each node says, including two
   nodes that both claim to lead. It never paints the cluster "healthy".
 - **Read-only.** It sends nothing to a node except `GET /metrics`.

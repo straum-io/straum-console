@@ -1,14 +1,16 @@
-# `/api/v1`: the state and event schemas
+# `/api/v1`: the state, event and history schemas
 
-The console serves two JSON documents: the **state**, a snapshot of every
-configured node, and the **event**, a change the console saw between two
-polls. Both are read-only. The console sends nothing to a node except
+The console serves three JSON documents: the **state**, a snapshot of every
+configured node; the **event**, a change the console saw between two
+polls; and the **history**, one series over the recent rounds. All three
+are read-only. The console sends nothing to a node except
 `GET /metrics`, and it reads only the series the core declares stable.
 
 | Where | What |
 |---|---|
 | `GET /api/v1/state` | The latest state; 503 until the first round has closed. |
 | `GET /api/v1/stream` | Server-sent events: `event: state` carries a state after every poll round, `event: event` carries one event with `id:` set to `<epoch>/<id>`, and `event: gap` says events were missed. |
+| `GET /api/v1/history?series=<name>[,<name>…]&node=<id>&range=15m\|1h&since=<ms>` | `{"histories": [...]}`: one history document per series named (at most 14), over the last 15 minutes (default) or hour, for every node or one (see History); with `since`, only the rounds whose `t` is after it. 400 for an unknown series, node or range, more than 14 names, or a `since` that is not Unix milliseconds; 503 before the collector starts. |
 | `GET /api/v1/events?after=<id>&limit=<n>` | `{"events": [...]}`: the events of the current epoch after `id` (default 0), oldest first, at most `limit` (1 to 2000, default 2000). If some were evicted, the first id returned is larger than `after` + 1. Ids restart with each epoch: a client that keeps `after` across a console restart compares `epoch`. |
 
 Every endpoint answers 421 to a request whose `Host` is not `localhost` or
@@ -22,7 +24,7 @@ trailing zeros dropped (`2026-10-21T12:00:02.01Z`), the same as
 
 ## Compatibility
 
-`schema_version` is 1, for both documents.
+`schema_version` is 1, for each of the three documents.
 
 These changes keep the version:
 - adding a field;
@@ -242,3 +244,57 @@ Otherwise the stream sends, after the state:
 client that cannot keep up (32 messages queued) is disconnected, never
 waited for; it reconnects and resumes from its `Last-Event-ID`. At most 64
 streams are open at once; beyond that the stream answers 503.
+
+## History
+
+The console keeps the last 1,800 rounds in memory, whatever the interval:
+1 h at the default 2 s, 30 min at 1 s, 30 h at 1 min. Nothing is written
+to disk; a restart starts a new epoch with no history. At most 15 nodes
+may be configured, which bounds the memory at about 2.4 MB.
+
+The answer is `{"histories": [...]}`, one document like the one below per
+series, in the order asked. A page asks for all its charts' series in one
+request: it fetches a range once, then only the rounds `since` the last
+`t` it holds, and drops those older than `range_ms`. An hour of
+`commit_rate` at 5 nodes is about 190 KB; one round is about 600 B. With
+`since`, `from` and `to` cover the rounds returned.
+
+```json
+{
+  "schema_version": 1,
+  "epoch": "9f2c4e1ab07d5e33",
+  "series": "log_end_minus_commit",
+  "derived": true,
+  "interval_ms": 2000,
+  "range_ms": 900000,
+  "from": "2026-10-21T11:59:58.003Z",
+  "to": "2026-10-21T12:00:00.003Z",
+  "t": [1792583998003, 1792584000003],
+  "nodes": [
+    {"id": 0, "address": "10.0.0.1:9100", "observed_at": [1792583998003, 1792584000003], "v": [0, 0]},
+    {"id": 1, "address": "10.0.0.2:9100", "observed_at": [1792583998003, 1792584000003], "v": [0, 4]},
+    {"id": 2, "address": "10.0.0.3:9100", "observed_at": [1792583998003, null], "v": [0, null]}
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `series` | string | A stable series name, or one of the derived series below. |
+| `derived` | boolean | True for a series the console computes. |
+| `interval_ms` | integer | The polling interval. |
+| `range_ms` | integer | The range asked for. A range returns at most what the ring holds, so it can cover less. |
+| `from`, `to` | time \| null | The first and last round returned: the span actually covered. Null when no round has closed. |
+| `t` | array of integer | Each round's `generated_at`, in Unix milliseconds, oldest first. |
+| `nodes[].id` | integer | The configured id, in configuration order. |
+| `nodes[].address` | string | The configured metrics address the values were read from. |
+| `nodes[].observed_at` | array of integer \| null | When the node's response at each `t` was read, in Unix milliseconds; null where the node was unknown. |
+| `nodes[].v` | array of number \| null | The value at each `t`. Null where the node was unknown in that round, or where a derived value cannot be computed. |
+
+### Derived series
+
+| Series | Meaning |
+|---|---|
+| `commit_rate` | Per node, records committed per second as that node knows it: the change of `straum_commit` between two consecutive rounds, divided by the time between the two readings. Null when the node was unknown in either round, a round was missed between them, `straum_commit` went backwards (a restart), or the set of nodes reporting `straum_leading` = 1 changed. The leader's rate is the cluster's. |
+| `log_end_minus_commit` | `straum_log_end − straum_commit`: records this node holds that are not committed as it knows it. |
+| `log_end_minus_durable` | `straum_log_end − straum_log_durable`: records this node holds that it has not yet synced. |

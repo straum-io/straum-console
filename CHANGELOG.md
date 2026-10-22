@@ -29,6 +29,15 @@ their own schema version (`docs/state-json.md`).
   it), `t` switches the theme, `?` lists the keys.
 - A filter on every page: nodes by id, address, state or error, events by
   name, node or text; it stays in the URL (`#/events?q=leading`).
+- A short history: the last 1,800 rounds of every stable series, in
+  memory, served by `GET /api/v1/history` (its own schema version 1,
+  `docs/state-json.md`; several series per request, and `since` returns
+  only newer rounds), with the derived `commit_rate`,
+  `log_end_minus_commit` and `log_end_minus_durable`. Charts on Overview
+  (commit rate), Cluster & Leader (slot, leading) and Replication &
+  Durability (not yet synced, not yet committed), with a 15 min / 1 h
+  range.
+- At most 15 nodes; more is a startup error.
 - `--debug-listen`: `net/http/pprof` on a second loopback address, off by
   default.
 - `--version`.

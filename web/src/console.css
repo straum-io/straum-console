@@ -99,3 +99,21 @@ tr.gap td { color: var(--st-warning); font: 12px var(--st-mono); background: rep
 	main, header { padding-inline: 16px; }
 	table.grid { display: block; overflow-x: auto; }
 }
+
+/* Charts: categorical slots validated against --st-bg-2 in each theme. */
+:root { --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767; }
+:root[data-theme='light'] { --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100; --series-5: #e87ba4; --series-6: #008300; --series-7: #6250d6; --series-8: #e34948; }
+.charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 640px)); gap: 16px; margin: 18px 0 24px; }
+.chart { background: var(--st-bg-2); border: 1px solid var(--st-border); border-radius: var(--st-radius); padding: 12px 14px; min-width: 0; }
+.chart svg { display: block; width: 100%; height: auto; touch-action: none; }
+.chart path { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .grid-line line { stroke: var(--st-border); }
+.chart text { font: 11px var(--st-mono); fill: var(--st-text-2); }
+.chart .cross { stroke: var(--st-text-2); stroke-dasharray: 2 3; }
+.chart figcaption { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 12px var(--st-mono); color: var(--st-text-2); margin-top: 6px; }
+.chart figcaption b { color: var(--st-text); font-weight: 600; }
+.chart .key i { display: inline-block; width: 12px; height: 2px; vertical-align: middle; margin-right: 5px; }
+.chart .unit { margin-left: auto; }
+.range { display: inline-flex; gap: 4px; }
+.range button { font: 12px var(--st-mono); color: var(--st-text-2); background: none; border: 1px solid var(--st-border); border-radius: var(--st-radius); padding: 2px 8px; cursor: pointer; }
+.range button.on { color: var(--st-accent); border-color: var(--st-accent); }

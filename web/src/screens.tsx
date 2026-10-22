@@ -1,6 +1,7 @@
 import { entries, state, ageMs, type State } from './api';
 import { EventRows, Fact, Filtered, NodeCard, StateBadge, age, describe, reading } from './ui';
 import { eventCount, filterEntries, nodeMatches } from './search';
+import { Charts } from './chart';
 
 function leadingText(s: State): string {
 	const l = s.cluster.leading;
@@ -20,6 +21,11 @@ export function Overview() {
 				<Fact value={leadingText(s)} label={s.cluster.leading.length > 1 ? 'report leading (both shown as reported)' : 'reports leading'} />
 				<Fact value={s.cluster.max_slot ?? '—'} label="highest slot reported" />
 			</div>
+			<Charts
+				charts={[
+					{ series: 'commit_rate', title: 'Commit rate', unit: "records/s, as each node knows it; the leader's is the cluster's" },
+				]}
+			/>
 			<Filtered shown={nodes.length} total={s.nodes.length} what="nodes" />
 			<div class="cards">
 				{nodes.map((n) => (
@@ -58,6 +64,12 @@ export function Cluster() {
 				Each row is what that node reports about itself. Commit, applied and log positions are per node: the console never
 				adds them up. A node that does not answer keeps its last values, dimmed, with their age.
 			</p>
+			<Charts
+				charts={[
+					{ series: 'straum_slot', title: 'Slot', unit: 'straum_slot' },
+					{ series: 'straum_leading', title: 'Reports leading', unit: 'straum_leading, 1 or 0' },
+				]}
+			/>
 			<Filtered shown={nodes.length} total={s.nodes.length} what="nodes" />
 			<table class="grid">
 				<thead>
