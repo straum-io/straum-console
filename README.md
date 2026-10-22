@@ -105,7 +105,8 @@ broker's own terms.
 
 The console polls every 2 s (`--interval`) and serves on `127.0.0.1:8080`
 (`--listen`, loopback only): open http://localhost:8080. Press `?` for the
-keys: `1`–`6` for the pages, `/` to filter what a page lists. The same data
+keys: `1`–`6` for the pages, `/` to filter what a page lists; the same
+list turns them off. The same data
 is JSON:
 
 ```sh

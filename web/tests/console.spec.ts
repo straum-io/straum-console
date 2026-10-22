@@ -283,6 +283,38 @@ test('hotkeys: numbers open pages, ? lists the keys, t switches the theme', asyn
 	await page.keyboard.press('t');
 });
 
+test('the single-key shortcuts can be turned off, and stay off after a reload', async ({ page }) => {
+	await open(page);
+	await page.getByRole('button', { name: 'keyboard shortcuts' }).click();
+	const toggle = page.getByRole('checkbox', { name: 'single-key shortcuts' });
+	await expect(toggle).toBeChecked();
+	await toggle.uncheck();
+	await page.keyboard.press('Escape');
+
+	const keysDoNothing = async () => {
+		const theme = await page.evaluate(() => document.documentElement.dataset['theme']);
+		for (const k of ['2', '6', 't', '?', '/']) await page.keyboard.press(k);
+		await expect(page.locator('h1')).toHaveText('Overview');
+		await expect(page.locator('dialog#keys')).toBeHidden();
+		await expect(page.locator('#search')).not.toBeFocused();
+		expect(await page.evaluate(() => document.documentElement.dataset['theme'])).toBe(theme);
+		await expect(page.locator('nav kbd')).toHaveCount(0);
+		await expect(page.locator('#search')).not.toHaveAttribute('aria-keyshortcuts');
+		await expect(page.getByRole('button', { name: 'keyboard shortcuts' })).not.toHaveAttribute('aria-keyshortcuts');
+	};
+	await keysDoNothing();
+	await page.reload();
+	await expect(page.locator('h1')).toHaveText('Overview');
+	await keysDoNothing();
+
+	await page.getByRole('button', { name: 'keyboard shortcuts' }).click();
+	await page.getByRole('checkbox', { name: 'single-key shortcuts' }).check();
+	await page.keyboard.press('Escape');
+	await page.keyboard.press('2');
+	await expect(page.locator('h1')).toHaveText('Cluster & Leader');
+	await expect(page.locator('nav kbd')).toHaveCount(6);
+});
+
 test('search filters what each page lists, lives in the URL, and keys do not fire while typing', async ({ page }) => {
 	await open(page);
 	// Keys typed into the field are text, never page keys or the theme key.
