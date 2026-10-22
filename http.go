@@ -79,6 +79,24 @@ func routes(h *hub) http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string][]event{"events": evs})
 	})
+	mux.HandleFunc("GET /api/v1/history", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		series, node, span, since, err := parseHistoryQuery(q.Get("series"), q.Get("node"), q.Get("range"), q.Get("since"))
+		if err == nil && h.history == nil {
+			jsonError(w, http.StatusServiceUnavailable, "no history is kept")
+			return
+		}
+		var docs []historyDoc
+		if err == nil {
+			docs, err = h.history.queryAll(h.epoch, series, node, span, since)
+		}
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string][]historyDoc{"histories": docs})
+	})
 	mux.HandleFunc("GET /api/v1/stream", func(w http.ResponseWriter, r *http.Request) { stream(w, r, h) })
 	mux.Handle("GET /", static())
 	return headers(mux)

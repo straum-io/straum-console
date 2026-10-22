@@ -34,7 +34,7 @@ func newCollector(cfg config, log *slog.Logger) *collector {
 	var b [8]byte
 	rand.Read(b[:])
 	epoch := hex.EncodeToString(b[:])
-	return &collector{
+	c := &collector{
 		cfg:         cfg,
 		client:      metrics.Client{Timeout: requestTimeout(cfg)},
 		addrs:       addrs,
@@ -43,6 +43,8 @@ func newCollector(cfg config, log *slog.Logger) *collector {
 		state:       state{Epoch: epoch},
 		misreported: map[int]map[uint64]bool{},
 	}
+	c.hub.history = newHistory(cfg.nodes)
+	return c
 }
 
 // requestTimeout bounds each node's request: below the interval, so the
@@ -59,6 +61,7 @@ func (c *collector) round(ctx context.Context) (state, []event, bool) {
 		return c.state, nil, false
 	}
 	next := nextState(c.state, r, c.cfg)
+	c.hub.history.add(next)
 	evs := c.hub.publish(next, deriveEvents(c.state, next, c.skipped, c.misreported))
 	if c.state.Round == 0 {
 		for _, n := range next.Nodes {

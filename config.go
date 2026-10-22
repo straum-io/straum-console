@@ -38,6 +38,7 @@ const (
 	envDebug    = "STRAUM_CONSOLE_DEBUG_LISTEN"
 
 	defaultListen = "127.0.0.1:8080"
+	maxNodes      = 15
 
 	minInterval     = time.Second
 	maxInterval     = time.Minute
@@ -152,6 +153,10 @@ func parseNodes(spec string) ([]node, error) {
 		}
 		ids[id], addrs[addr] = true, true
 		nodes = append(nodes, node{id, addr})
+	}
+	// The history's memory is sized for this many (CON-D-7 A, plan §14).
+	if len(nodes) > maxNodes {
+		return nil, fmt.Errorf("%d nodes: at most %d", len(nodes), maxNodes)
 	}
 	return nodes, nil
 }

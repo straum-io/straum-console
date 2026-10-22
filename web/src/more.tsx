@@ -4,6 +4,7 @@
 import { state, ageMs } from './api';
 import { Fact, Filtered, StateBadge, age, reading } from './ui';
 import { matches, nodeMatches } from './search';
+import { Charts } from './chart';
 
 /** The stable series, as the core declares them (D-141 A). */
 const stable = [
@@ -31,6 +32,13 @@ export function Durability() {
 				that is durable on a majority of the nodes (the core's ADR-0005). That is the broker's decision, shown here as text,
 				not something the console measures.
 			</p>
+			<Charts
+				charts={[
+					{ series: 'log_end_minus_durable', title: 'Not yet synced', unit: 'log_end − log_durable, records' },
+					{ series: 'log_end_minus_commit', title: 'Not yet committed', unit: 'log_end − commit, records' },
+					{ series: 'straum_lag', title: 'Own lag', unit: 'straum_lag, records' },
+				]}
+			/>
 			<Filtered shown={nodes.length} total={s.nodes.length} what="nodes" />
 			<table class="grid durability">
 				<thead>

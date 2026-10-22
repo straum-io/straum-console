@@ -360,3 +360,37 @@ test('no page is wider than the window, and the help dialog sits in the middle',
 	const box = (await page.locator('dialog#keys').boundingBox())!;
 	expect(Math.abs(box.x + box.width / 2 - 512)).toBeLessThan(20);
 });
+
+test('each page charts its history, one line per node, with a readout on hover', async ({ page }) => {
+	await open(page);
+	const rate = page.locator('figure[data-series="commit_rate"]');
+	await expect(rate.locator('path')).toHaveCount(3, { timeout: 15_000 });
+	await expect(rate.locator('h3 .tag')).toHaveText('derived');
+	await expect(rate.locator('.key')).toHaveCount(3);
+	// After the first fetch, only the rounds since the last one held: the line grows from them.
+	const points = async () => ((await rate.locator('path').first().getAttribute('d')) ?? '').split(/[ML]/).length;
+	const before = await points();
+	await page.waitForRequest(/history\?series=commit_rate&range=15m&since=\d+/, { timeout: 30_000 });
+	await expect.poll(points, { timeout: 15_000 }).toBeGreaterThan(before);
+	await expect(rate.locator('.when')).toContainText(/latest, \d/);
+	const box = (await rate.locator('svg').boundingBox())!;
+	await page.mouse.move(box.x + box.width / 3, box.y + box.height / 2);
+	await expect(rate.locator('.cross')).toHaveCount(1);
+	await expect(rate.locator('.when')).not.toContainText('latest');
+
+	// More than 15 s in, a new range is fetched whole, at once: the 1 h line holds at least the 15 min one.
+	const grown = await points();
+	const whole = page.waitForRequest((r) => r.url().includes('range=1h') && !r.url().includes('since='), { timeout: 5_000 });
+	await page.getByRole('button', { name: '1 h' }).click();
+	await expect(page.getByRole('button', { name: '1 h' })).toHaveAttribute('aria-pressed', 'true');
+	await whole;
+	await expect.poll(points, { timeout: 5_000 }).toBeGreaterThanOrEqual(grown);
+
+	await page.getByRole('link', { name: 'Cluster & Leader' }).click();
+	await expect(page.locator('figure[data-series="straum_slot"] path')).toHaveCount(3, { timeout: 15_000 });
+	await expect(page.locator('figure[data-series="straum_slot"] h3 .tag')).toHaveCount(0);
+
+	await page.getByRole('link', { name: 'Replication & Durability' }).click();
+	for (const s of ['log_end_minus_durable', 'log_end_minus_commit', 'straum_lag'])
+		await expect(page.locator(`figure[data-series="${s}"] path`)).toHaveCount(3, { timeout: 15_000 });
+});

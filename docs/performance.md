@@ -36,6 +36,39 @@ console binary polling them every 2 s; 64 streams reading
 360 samples; the raw series is not kept in the repository. Rerun with
 `SOAK_OUT=soak.csv make soak`.
 
+### With history (straum-console#32)
+
+The same soak, on 2026-10-21/22 at revision `9dfe69a` plus the history
+change, for 75 minutes so the 1,800-round ring fills, with 64 history
+readers beside the 64 streams. Each reader acts as an open Replication &
+Durability page, the page with the most charts: one request for its three
+series over the 1 h range, then every 15 s only the rounds `since` its last
+(`web/src/chart.tsx`). The binary predates one later server change:
+the series of a request are read under one lock rather than one each.
+
+| Budget (§14) | Target | Measured | |
+|---|---|---|---|
+| Backend RSS | ≤ 40 MB steady | 23.2 MiB at most (23,792 KiB) | met |
+| Backend CPU | ≤ 1 % of one core | 0.56 % over 4,507 s (15-minute windows 0.50–0.57 %) | met |
+| No growth | heap at the end = earlier | median heap in use 5.37 MB in the second quarter, 5.50 MB in the last (+2.3 %) | met |
+| History requests | none fail | none failed; every stream stayed open | met |
+
+The design took three failed runs to get there, all on this machine:
+
+| Readers fetch | CPU | Heap, 2nd → last quarter | |
+|---|---|---|---|
+| The whole 1 h of `commit_rate` every 5 s | 6.12 % | 6.46 → 8.45 MB (+31 %) | failed |
+| `since`, one series every 5 s (stopped at 3,225 s: it modelled one chart per page) | 1.00 % | — | stopped |
+| `since`, three series in one request every 5 s | 1.07 % | 5.18 → 5.44 MB (+5 %) | failed |
+| `since`, three series in one request every 15 s | 0.56 % | 5.37 → 5.50 MB (+2.3 %) | met |
+
+A 60 s CPU profile during the third run spent almost all its samples in
+system calls and thread wakeups for loopback writes; building and
+encoding the history documents did not show. The load is stricter than
+§14's CPU condition (10 browsers): 64 readers. The pre-history soak
+(0.40 %) ran on another day, so the difference is not the cost of history
+alone.
+
 ## Per-round cost (`make bench`)
 
 `make bench`: 10 runs each, medians. The machine was not idle: the load
@@ -59,14 +92,14 @@ measured.
 
 | Budget | Target | Measured | |
 |---|---|---|---|
-| Frontend bundle | ≤ 60 KB gzip JS + CSS | 15,775 B (`make web-size`, CI) | met |
+| Frontend bundle | ≤ 60 KB gzip JS + CSS | 19,501 B (`make web-size`, CI) | met |
 | SSE per round | ≤ 4 KiB per client at 5 nodes | 1,976 B (`TestStreamRoundSize`) | met |
 | Nodes supported | 3–15 | 15 fixture nodes observed in one round (`TestFifteenNodes`); 3 real nodes (`make e2e`) | met |
 | Event payload | ≤ 1 KiB | node error text capped at 256 B where it enters the state | met by construction |
 | Event retention | 2000 events | a ring of 2000 (`TestRing`) | met |
 | Allocations per round | ≤ 1 parse buffer per node, 1 state encode | 2,762 allocations and 560 KB per `Collect` of 5 nodes | **not met** |
 | Scrape load on a node | ≤ 0.5 req/s, ≤ 1 concurrent | 0.5 req/s at the default interval, one request per node in flight, by construction | met; the cost on the node is not measured (below) |
-| History | 1 h | not applicable: schema v1 keeps no history | — |
+| History | 1,800 rounds (1 h at 2 s), at most 15 nodes (CON-D-7 A) | a ring of 1,800 rounds allocated once (`TestHistoryRing`); 16 nodes refused at startup (`TestNodeCap`); the soak above | met |
 
 The allocations budget was written for a parser in the console. The
 parsing is straum-cli's `metrics` package (CON-D-1 A), which reads each

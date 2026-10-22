@@ -22,6 +22,8 @@ type hub struct {
 	maxClient int
 	queue     int
 	closed    bool
+	// history is set by the collector before serving; read-only after.
+	history *history
 }
 
 func newHub(epoch string) *hub {
