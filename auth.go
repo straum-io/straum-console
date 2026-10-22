@@ -119,6 +119,8 @@ type auth struct {
 	turn    chan struct{} // the one check slot
 	inLine  atomic.Int32
 	checked atomic.Int64 // hashes computed, for the tests
+	running atomic.Int32 // hashes running now
+	overlap atomic.Bool  // two ever ran at once, for the tests
 
 	mu       sync.Mutex
 	sessions map[string]session
@@ -170,6 +172,10 @@ func (a *auth) check(ctx context.Context, user, password string) (bool, error) {
 		c = decoy
 	}
 	a.checked.Add(1)
+	if a.running.Add(1) > 1 {
+		a.overlap.Store(true)
+	}
+	defer a.running.Add(-1)
 	key := argon2.IDKey([]byte(password), c.salt, argonTime, argonMemory, argonThreads, uint32(len(c.key)))
 	return subtle.ConstantTimeCompare(key, c.key) == 1 && known, nil
 }

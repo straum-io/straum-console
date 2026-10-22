@@ -116,12 +116,21 @@ func routes(h *hub, a *auth, public []string) http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string][]historyDoc{"histories": docs})
 	})
-	mux.HandleFunc("GET /api/v1/stream", func(w http.ResponseWriter, r *http.Request) { stream(w, r, h) })
+	mux.HandleFunc("GET /api/v1/stream", func(w http.ResponseWriter, r *http.Request) {
+		// A stream outlives its request: the session is checked again
+		// before every message, so one that ends (signed out, expired, the
+		// user removed or given a new password) ends the stream too.
+		live := func() bool { return true }
+		if a != nil {
+			live = func() bool { _, ok := a.user(r); return ok }
+		}
+		stream(w, r, h, live)
+	})
 	mux.Handle("GET /", static())
 	return headers(signedIn(a, mux), public, a != nil)
 }
 
-func stream(w http.ResponseWriter, r *http.Request, h *hub) {
+func stream(w http.ResponseWriter, r *http.Request, h *hub, live func() bool) {
 	if r.Method == http.MethodHead {
 		w.Header().Set("Content-Type", "text/event-stream")
 		return // takes no stream slot
@@ -139,6 +148,9 @@ func stream(w http.ResponseWriter, r *http.Request, h *hub) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-store")
 	send := func(b []byte) bool {
+		if !live() {
+			return false
+		}
 		rc.SetWriteDeadline(time.Now().Add(writeTimeout))
 		_, err := w.Write(b)
 		return err == nil && rc.Flush() == nil

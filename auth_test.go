@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -109,6 +110,15 @@ func TestRateLimit(t *testing.T) {
 	}
 	if len(a.sources) != maxSources {
 		t.Errorf("%d sources held", len(a.sources))
+	}
+	// Sign-ins from many sources at once still hash one at a time.
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Go(func() { a.check(context.Background(), fmt.Sprint("user", i), "x") })
+	}
+	wg.Wait()
+	if a.overlap.Load() || a.checked.Load() != 8 {
+		t.Errorf("overlap %v, %d hashes", a.overlap.Load(), a.checked.Load())
 	}
 	// A full line of sign-ins: the next is refused before it waits.
 	a.inLine.Store(maxInLine)
@@ -275,5 +285,57 @@ func TestSessionWithoutSignIn(t *testing.T) {
 	}
 	if code, _, _ := get(t, url+"/login"); code != 405 && code != 404 {
 		t.Errorf("no sign-in without a password file: %d", code)
+	}
+}
+
+// An open stream ends with its session: signed out from another request,
+// or the password changed and the file reloaded.
+func TestStreamEndsWithSession(t *testing.T) {
+	for _, end := range []string{"sign-out", "new password"} {
+		t.Run(end, func(t *testing.T) {
+			h := newHub("e1")
+			h.publish(exampleState(), nil)
+			a := testAuth(t, "alice:"+aliceHash)
+			srv := httptest.NewTLSServer(routes(h, a, nil))
+			t.Cleanup(func() { h.close(); srv.Close() })
+			c := srv.Client()
+			c.Jar, _ = cookiejar.New(nil)
+			resp, err := c.PostForm(srv.URL+"/login", url.Values{"user": {"alice"}, "password": {"correct horse"}})
+			if err != nil || resp.StatusCode != 204 {
+				t.Fatalf("sign-in: %v %v", err, resp)
+			}
+			stream, err := c.Get(srv.URL + "/api/v1/stream")
+			if err != nil || stream.StatusCode != 200 {
+				t.Fatalf("stream: %v %v", err, stream)
+			}
+			defer stream.Body.Close()
+			buf := make([]byte, 64<<10)
+			if n, err := stream.Body.Read(buf); err != nil || n == 0 {
+				t.Fatalf("first message: %d %v", n, err)
+			}
+			if end == "sign-out" {
+				c.Post(srv.URL+"/logout", "", nil)
+			} else {
+				os.WriteFile(a.path, []byte("alice:"+strings.Replace(aliceHash, "2v0Y0ByCXIuem6HOv45dng", "AAAAAAAAAAAAAAAAAAAAAA", 1)), 0o600)
+				if err := a.reload(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			h.publish(exampleState(), nil)
+			done := make(chan error, 1)
+			go func() {
+				for {
+					if _, err := stream.Body.Read(buf); err != nil {
+						done <- err
+						return
+					}
+				}
+			}()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				t.Fatal("the stream outlived its session")
+			}
+		})
 	}
 }
