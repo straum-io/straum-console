@@ -456,7 +456,7 @@ test('with a password file the page signs in over TLS and signs out', async ({ b
 		await expect(page.locator('h1')).toHaveText('Overview');
 		await expect(page.locator('.pill.live')).toBeVisible({ timeout: 15_000 });
 		const [cookie] = await context.cookies();
-		expect(cookie).toMatchObject({ name: 'straum_console_session', httpOnly: true, secure: true, sameSite: 'Strict' });
+		expect(cookie).toMatchObject({ name: '__Host-straum_console_session', httpOnly: true, secure: true, sameSite: 'Strict' });
 
 		await page.getByRole('button', { name: 'sign out' }).click();
 		await expect(page.getByLabel('User')).toBeVisible();

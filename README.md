@@ -153,7 +153,8 @@ A sign-in is checked one at a time, each check holding about 19 MiB for
 its duration; at most 64 wait, and one address (an IPv6 /64) gets 10
 attempts a minute. A session lasts 12 hours, in memory: a restart signs
 everyone out. `kill -HUP` re-reads the password file and the certificate;
-a user taken out of the file is signed out at the next request.
+a user taken out of the file, or given a new password, is signed out at
+the next request.
 
 A release is a pushed `v*` tag on `main`. The workflow builds the archives,
 `checksums.txt` and a signed build provenance for each

@@ -154,6 +154,16 @@ func TestSessions(t *testing.T) {
 	if _, ok := a.user(req(token)); !ok {
 		t.Fatal("a failed reload ended a session")
 	}
+	// A new password (here: a new salt, so a new key) ends the session.
+	other := strings.Replace(aliceHash, "2v0Y0ByCXIuem6HOv45dng", "AAAAAAAAAAAAAAAAAAAAAA", 1)
+	os.WriteFile(a.path, []byte("alice:"+other), 0o600)
+	if err := a.reload(); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := a.user(req(token)); ok {
+		t.Fatal("alice's password changed and her session lived on")
+	}
+	token = a.open("alice")
 	os.WriteFile(a.path, []byte("bob:"+aliceHash), 0o600)
 	if err := a.reload(); err != nil {
 		t.Fatal(err)

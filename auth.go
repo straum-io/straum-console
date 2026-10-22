@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -33,7 +34,9 @@ const (
 
 	sessionTTL  = 12 * time.Hour
 	maxSessions = 1024
-	cookieName  = "straum_console_session"
+	// __Host-: the browser takes it only Secure, from this host, for /, so
+	// no sibling domain can set one in its place.
+	cookieName = "__Host-straum_console_session"
 
 	maxInLine         = 64 // logins running or waiting for the one check slot
 	attemptsPerMinute = 10 // per source
@@ -97,8 +100,11 @@ func parsePasswords(text string) (map[string]credential, error) {
 	return users, nil
 }
 
+// session holds the credential its user signed in with: a changed
+// password, like a removed user, ends it at the next request.
 type session struct {
 	user    string
+	cred    credential
 	expires time.Time
 }
 
@@ -127,7 +133,8 @@ func newAuth(path string) (*auth, error) {
 }
 
 // reload re-reads the password file; on an error the users stay as they
-// were. A session whose user is gone ends at its next request.
+// were. A session whose user is gone, or whose password changed, ends at
+// its next request.
 func (a *auth) reload() error {
 	b, err := os.ReadFile(a.path)
 	if err != nil {
@@ -241,7 +248,7 @@ func (a *auth) open(user string) string {
 			delete(a.sessions, first)
 		}
 	}
-	a.sessions[token] = session{user, now.Add(sessionTTL)}
+	a.sessions[token] = session{user, (*a.users.Load())[user], now.Add(sessionTTL)}
 	return token
 }
 
@@ -259,7 +266,7 @@ func (a *auth) user(r *http.Request) (string, bool) {
 		delete(a.sessions, c.Value)
 		return "", false
 	}
-	if _, known := (*a.users.Load())[s.user]; !known {
+	if cur, known := (*a.users.Load())[s.user]; !known || !bytes.Equal(cur.salt, s.cred.salt) || !bytes.Equal(cur.key, s.cred.key) {
 		delete(a.sessions, c.Value)
 		return "", false
 	}
