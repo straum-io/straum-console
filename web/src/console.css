@@ -119,3 +119,13 @@ tr.gap td { color: var(--st-warning); font: 12px var(--st-mono); background: rep
 .range { display: inline-flex; gap: 4px; }
 .range button { font: 12px var(--st-mono); color: var(--st-text-2); background: none; border: 1px solid var(--st-border); border-radius: var(--st-radius); padding: 2px 8px; cursor: pointer; }
 .range button.on { color: var(--st-accent); border-color: var(--st-accent); }
+
+/* Sign-in (CON-D-8) */
+.signin { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.signin form { display: grid; gap: 14px; width: min(320px, 100%); background: var(--st-bg-2); border: 1px solid var(--st-border); border-radius: var(--st-radius); padding: 24px; }
+.signin .brand { padding: 0 0 4px; }
+.signin label { display: grid; gap: 6px; font-size: 13px; color: var(--st-text-2); }
+.signin input { font: 14px var(--st-font); padding: 7px 10px; background: var(--st-bg); color: var(--st-text); border: 1px solid var(--st-border); border-radius: var(--st-radius); }
+.signin input:focus { border-color: var(--st-accent); outline: none; box-shadow: 0 0 0 3px var(--st-accent-soft); }
+.signin [role="alert"] { font-size: 13px; color: var(--st-danger); }
+.signin button { justify-self: start; padding: 6px 14px; }

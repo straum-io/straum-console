@@ -1,7 +1,7 @@
 import { render } from 'preact';
-import { connect } from './api';
+import { start } from './api';
 import { App } from './app';
 import './console.css';
 
-connect();
+void start();
 render(<App />, document.getElementById('app')!);

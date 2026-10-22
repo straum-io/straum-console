@@ -426,3 +426,43 @@ test('each page charts its history, one line per node, with a readout on hover',
 	for (const s of ['log_end_minus_durable', 'log_end_minus_commit', 'straum_lag'])
 		await expect(page.locator(`figure[data-series="${s}"] path`)).toHaveCount(3, { timeout: 15_000 });
 });
+
+// A second console with TLS and a password file (CON-D-8): the page asks for
+// a sign-in, refuses a wrong password, shows the console after a right one,
+// and signs out. The certificate is made for the test, not kept.
+test('with a password file the page signs in over TLS and signs out', async ({ browser }) => {
+	const { execFileSync } = await import('node:child_process');
+	const { mkdtempSync } = await import('node:fs');
+	const { tmpdir } = await import('node:os');
+	const dir = mkdtempSync(`${tmpdir()}/straum-console-tls-`);
+	execFileSync('openssl', ['req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes', '-days', '1',
+		'-subj', '/CN=localhost', '-keyout', `${dir}/key.pem`, '-out', `${dir}/cert.pem`], { stdio: 'ignore' });
+	const port = consolePort + 1;
+	const spec = nodes.map((f, i) => `${i}=127.0.0.1:${f.port}`).join(',');
+	const proc = spawn(`${root}bin/straum-console`, ['--node', spec, '--interval', '1s', '--listen', `127.0.0.1:${port}`,
+		'--tls-cert', `${dir}/cert.pem`, '--tls-key', `${dir}/key.pem`, '--password-file', `${root}testdata/passwords`], { stdio: 'ignore' });
+	const context = await browser.newContext({ ignoreHTTPSErrors: true });
+	try {
+		const page = await context.newPage();
+		await expect.poll(async () => (await page.request.get(`https://127.0.0.1:${port}/healthz`).catch(() => null))?.status(), { timeout: 10_000 }).toBe(200);
+		await page.goto(`https://127.0.0.1:${port}/`);
+		await page.getByLabel('User').fill('alice');
+		await page.getByLabel('Password').fill('wrong');
+		await page.getByRole('button', { name: 'sign in' }).click();
+		await expect(page.getByRole('alert')).toHaveText('wrong user name or password');
+
+		await page.getByLabel('Password').fill('correct horse');
+		await page.getByRole('button', { name: 'sign in' }).click();
+		await expect(page.locator('h1')).toHaveText('Overview');
+		await expect(page.locator('.pill.live')).toBeVisible({ timeout: 15_000 });
+		const [cookie] = await context.cookies();
+		expect(cookie).toMatchObject({ name: '__Host-straum_console_session', httpOnly: true, secure: true, sameSite: 'Strict' });
+
+		await page.getByRole('button', { name: 'sign out' }).click();
+		await expect(page.getByLabel('User')).toBeVisible();
+		expect(await context.cookies()).toHaveLength(0);
+	} finally {
+		await context.close();
+		proc.kill('SIGKILL');
+	}
+});

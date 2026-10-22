@@ -43,3 +43,6 @@ web/playwright-report/
 # Release archives (make release-snapshot)
 /dist/
 /image/
+
+# `go build` at the repository root
+/straum-console

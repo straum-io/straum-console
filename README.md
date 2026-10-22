@@ -49,9 +49,10 @@ binary that runs next to the cluster.
 - **Read-only.** It sends nothing to a node except `GET /metrics`.
   Administration waits until the broker has an admin API and
   authentication.
-- **Stays on loopback.** It listens on loopback only (default
-  `127.0.0.1:8080`) and refuses any other address. Open it from elsewhere with
-  `ssh -L 8080:127.0.0.1:8080 <console-host>`.
+- **Loopback unless signed in.** It listens on `127.0.0.1:8080` by
+  default. It leaves loopback only with TLS, a password file in the
+  broker's format and the host names browsers use, all three; otherwise
+  `ssh -L 8080:127.0.0.1:8080 <console-host>` is the way in.
 
 ## Install
 
@@ -65,8 +66,8 @@ there is one, any of these works:
 curl -fsSL https://raw.githubusercontent.com/straum-io/straum-console/main/install.sh | sh
 
 # Docker on a Linux host, with the host's network (the console listens on
-# loopback only; Docker Desktop's host networking on macOS and Windows is
-# not tested):
+# loopback unless signed in; Docker Desktop's host networking on macOS and
+# Windows is not tested):
 docker run --network host straumio/straum-console --node 0=127.0.0.1:9100
 
 # The archives themselves, for Linux, macOS and Windows on amd64 and arm64:
@@ -74,10 +75,9 @@ docker run --network host straumio/straum-console --node 0=127.0.0.1:9100
 ```
 
 `uninstall.sh` removes what `install.sh` put down (it keeps a list), the
-systemd unit included. A published port (`docker run -p`) cannot reach the
-console: inside the container's own network its loopback is not the host's,
-and the console does not listen beyond loopback, since it has no
-authentication.
+systemd unit included. A published port (`docker run -p`) reaches the
+console only when it signs in (below), listening on `:8443` inside the
+container; on loopback, the container's loopback is not the host's.
 
 From source, with Go 1.26:
 
@@ -117,13 +117,44 @@ curl -s 'localhost:8080/api/v1/events?after=0'
 
 [docs/state-json.md](docs/state-json.md) is the schema. Each change is also
 logged once, as a JSON line on stderr. `STRAUM_CONSOLE_NODES`,
-`STRAUM_CONSOLE_INTERVAL_MS`, `STRAUM_CONSOLE_LISTEN` and
-`STRAUM_CONSOLE_DEBUG_LISTEN` stand in for the flags; never put them in a
+`STRAUM_CONSOLE_INTERVAL_MS`, `STRAUM_CONSOLE_LISTEN`,
+`STRAUM_CONSOLE_DEBUG_LISTEN`, `STRAUM_CONSOLE_TLS_CERT`,
+`STRAUM_CONSOLE_TLS_KEY`, `STRAUM_CONSOLE_PASSWORD_FILE` and
+`STRAUM_CONSOLE_PUBLIC_HOSTS` stand in for the flags; never put them in a
 straum server's environment, which refuses unknown `STRAUM_*` variables.
 [docs/straum-console.service](docs/straum-console.service) is an example
 systemd unit. `--debug-listen 127.0.0.1:6060` serves Go's `pprof` on a
 second loopback address, off by default: a local diagnostic that any local
 process can use to start profiles, so leave it off in normal running.
+
+### Beyond loopback
+
+The console signs people in before it leaves loopback. It needs all of:
+
+```sh
+bin/straum-console --node 0=127.0.0.1:9100 \
+  --listen 0.0.0.0:8443 \
+  --tls-cert console.pem --tls-key console.key \
+  --password-file console.passwords \
+  --public-host console.example.org
+```
+
+- `--password-file` is the broker's format, one `user:hash` per line, the
+  hash from `straum-server hash-password` (a password on stdin). Only that
+  command's parameters are accepted (argon2id, m=19456, t=2, p=1), so a
+  refusal costs the same as an acceptance whatever the user name.
+- `--public-host` lists the names browsers use; any other `Host` is
+  refused (421), which keeps a web page from reaching the console through
+  a name of its own. `localhost` keeps working.
+- Without the password file the console stays on loopback, and the
+  password file needs TLS.
+
+A sign-in is checked one at a time, each check holding about 19 MiB for
+its duration; at most 64 wait, and one address (an IPv6 /64) gets 10
+attempts a minute. A session lasts 12 hours, in memory: a restart signs
+everyone out. `kill -HUP` re-reads the password file and the certificate;
+a user taken out of the file, or given a new password, is signed out at
+the next request.
 
 A release is a pushed `v*` tag on `main`. The workflow builds the archives,
 `checksums.txt` and a signed build provenance for each

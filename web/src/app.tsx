@@ -1,5 +1,6 @@
 import { signal } from '@preact/signals';
-import { connection, now, receivedAt, stale, state } from './api';
+import { useState } from 'preact/hooks';
+import { connection, now, receivedAt, signIn, signInNeeded, signOut, stale, state, user } from './api';
 import { age } from './ui';
 import { hashFor, query, setQuery } from './search';
 import { Cluster, Events, Overview } from './screens';
@@ -50,7 +51,9 @@ addEventListener('keydown', (e) => {
 	if (e.ctrlKey || e.metaKey || e.altKey) return;
 	if (document.querySelector('dialog[open]')) return; // the dialog handles Esc itself
 	const target = e.target as HTMLElement;
-	if (target.closest('input, textarea, select, [contenteditable]')) {
+	// Only fields that take text keep the keys: a checkbox (the shortcuts
+	// switch) does not.
+	if (target.closest('input:not([type=checkbox]), textarea, select, [contenteditable]')) {
 		if (e.key === 'Escape' && target.id === 'search') {
 			setQuery('');
 			target.blur();
@@ -105,7 +108,43 @@ function Status() {
 	return <span class={`pill ${c === 'disconnected' ? 'down' : 'warn'}`}>{c}</span>;
 }
 
+/** Shown in place of the console until the user signs in (CON-D-8). */
+function SignIn() {
+	const [error, setError] = useState<string | null>(null);
+	const [busy, setBusy] = useState(false);
+	const submit = async (e: Event) => {
+		e.preventDefault();
+		const f = new FormData(e.currentTarget as HTMLFormElement);
+		setBusy(true);
+		setError(await signIn(String(f.get('user')), String(f.get('password'))));
+		setBusy(false);
+	};
+	return (
+		<main class="signin">
+			<form onSubmit={submit}>
+				<div class="brand">
+					<img src="/mark.svg" alt="" width={24} height={24} />
+					straum-console
+				</div>
+				<label>
+					User
+					<input name="user" autocomplete="username" required autofocus />
+				</label>
+				<label>
+					Password
+					<input name="password" type="password" autocomplete="current-password" required />
+				</label>
+				{error && <p role="alert">{error}</p>}
+				<button class="theme" disabled={busy}>
+					sign in
+				</button>
+			</form>
+		</main>
+	);
+}
+
 export function App() {
+	if (signInNeeded.value) return <SignIn />;
 	const r = routes[route.value];
 	const s = state.value;
 	const View = r.view;
@@ -148,6 +187,11 @@ export function App() {
 					<button class="theme" type="button" onClick={openHelp} aria-label="keyboard shortcuts" aria-keyshortcuts={keys.value ? '?' : undefined}>
 						?
 					</button>
+					{user.value !== null && (
+						<button class="theme" type="button" onClick={() => void signOut()} title={`signed in as ${user.value}`}>
+							sign out
+						</button>
+					)}
 					<button class="theme" type="button" onClick={toggleTheme} aria-label={`${theme.value === 'dark' ? 'light' : 'dark'} theme`}>
 						{theme.value === 'dark' ? 'light' : 'dark'}
 					</button>

@@ -136,8 +136,48 @@ async function backfill() {
 	merge(live);
 }
 
+/** The signed-in user; null when the console asks no sign-in (CON-D-8). */
+export const user = signal<string | null>(null);
+/** The console wants a sign-in before it shows anything. */
+export const signInNeeded = signal(false);
+
+/** Asks who is signed in; false when a sign-in is needed. */
+async function session(): Promise<boolean> {
+	const r = await fetch('/api/v1/session');
+	if (r.status === 401) {
+		signInNeeded.value = true;
+		return false;
+	}
+	if (r.ok) user.value = ((await r.json()) as { user: string | null }).user;
+	return true;
+}
+
+/** Starts the page: the session first, then the stream. */
+export async function start() {
+	try {
+		if (!(await session())) return;
+	} catch {
+		// the stream below shows the console as not answering
+	}
+	connect();
+}
+
+/** Signs in; returns the reason when refused. */
+export async function signIn(name: string, password: string): Promise<string | null> {
+	const r = await fetch('/login', { method: 'POST', body: new URLSearchParams({ user: name, password }) });
+	if (r.status !== 204) return ((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? `HTTP ${r.status}`;
+	signInNeeded.value = false;
+	await start();
+	return null;
+}
+
+export async function signOut() {
+	await fetch('/logout', { method: 'POST' });
+	location.reload();
+}
+
 /** Opens the stream; the browser's EventSource retries on its own. */
-export function connect() {
+function connect() {
 	const es = new EventSource('/api/v1/stream');
 	es.addEventListener('state', (m) => {
 		const reconnected = connection.value !== 'live';
@@ -155,9 +195,16 @@ export function connect() {
 		failures++;
 		connection.value = failures >= 3 ? 'disconnected' : 'reconnecting';
 		if (es.readyState === EventSource.CLOSED) {
-			// Refused outright (for example 503, too many streams): the
-			// browser gives up, so retry ourselves, at most every 30 s.
-			setTimeout(connect, Math.min(30_000, 2_000 * failures));
+			// Refused outright (503, too many streams, or 401, the session
+			// ended): the browser gives up, so ask again ourselves, at most
+			// every 30 s, or sign in.
+			setTimeout(
+				() =>
+					void session()
+						.then((ok) => ok && connect())
+						.catch(() => connect()),
+				Math.min(30_000, 2_000 * failures),
+			);
 		}
 	};
 }
