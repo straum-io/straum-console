@@ -90,6 +90,8 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 dialog h2 { font: 700 18px var(--st-display); margin-bottom: 12px; }
 dialog dl { grid-template-columns: auto 1fr; gap: 8px 16px; margin-bottom: 16px; }
 dialog dd { font-family: var(--st-font); text-align: left; color: var(--st-text-2); }
+dialog .switch { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; color: var(--st-text-2); }
+dialog .switch input { accent-color: var(--st-accent); width: 16px; height: 16px; }
 tr.gap td { color: var(--st-warning); font: 12px var(--st-mono); background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--st-warning) 7%, transparent) 6px 12px); }
 
 @media (max-width: 720px) {

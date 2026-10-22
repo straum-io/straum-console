@@ -26,7 +26,8 @@ their own schema version (`docs/state-json.md`).
   `STRAUM_CONSOLE_LISTEN` and `STRAUM_CONSOLE_DEBUG_LISTEN` in place of the
   flags; an unknown `STRAUM_CONSOLE_*` variable is a startup error.
 - Keyboard shortcuts: `1`–`6` open the pages, `/` filters (`Esc` clears
-  it), `t` switches the theme, `?` lists the keys.
+  it), `t` switches the theme, `?` lists the keys. The list has a switch
+  that turns them off, remembered per browser (WCAG 2.1.4).
 - A filter on every page: nodes by id, address, state or error, events by
   name, node or text; it stays in the URL (`#/events?q=leading`).
 - A short history: the last 1,800 rounds of every stable series, in

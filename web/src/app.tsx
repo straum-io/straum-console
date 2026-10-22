@@ -25,8 +25,27 @@ function openHelp() {
 	(document.getElementById('keys') as HTMLDialogElement | null)?.showModal();
 }
 
+// Single-character keys can be turned off (WCAG 2.1.4), per browser.
+function initialKeys(): boolean {
+	try {
+		return localStorage.getItem('keys') !== 'off';
+	} catch {
+		return true;
+	}
+}
+const keys = signal(initialKeys());
+function setKeys(on: boolean) {
+	keys.value = on;
+	try {
+		localStorage.setItem('keys', on ? 'on' : 'off');
+	} catch {
+		// the choice lasts for this page only
+	}
+}
+
 // Keys: 1–6 open the pages in sidebar order, / searches, t switches the
-// theme, ? lists the keys. Never while typing, never with a modifier.
+// theme, ? lists the keys. Never while typing, never with a modifier, never
+// when turned off.
 addEventListener('keydown', (e) => {
 	if (e.ctrlKey || e.metaKey || e.altKey) return;
 	if (document.querySelector('dialog[open]')) return; // the dialog handles Esc itself
@@ -38,6 +57,7 @@ addEventListener('keydown', (e) => {
 		}
 		return;
 	}
+	if (!keys.value) return;
 	if (e.key === '/') {
 		e.preventDefault();
 		document.getElementById('search')?.focus();
@@ -101,7 +121,7 @@ export function App() {
 				{order.map((k, i) => (
 					<a href={hashFor(k)} class={route.value === k ? 'on' : ''} aria-current={route.value === k ? 'page' : undefined}>
 						{routes[k].title}
-						<kbd aria-hidden="true">{i + 1}</kbd>
+						{keys.value && <kbd aria-hidden="true">{i + 1}</kbd>}
 					</a>
 				))}
 			</nav>
@@ -121,11 +141,11 @@ export function App() {
 						type="search"
 						placeholder="Filter nodes and events"
 						aria-label="Filter nodes and events"
-						aria-keyshortcuts="/"
+						aria-keyshortcuts={keys.value ? '/' : undefined}
 						value={query.value}
 						onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
 					/>
-					<button class="theme" type="button" onClick={openHelp} aria-label="keyboard shortcuts" aria-keyshortcuts="?">
+					<button class="theme" type="button" onClick={openHelp} aria-label="keyboard shortcuts" aria-keyshortcuts={keys.value ? '?' : undefined}>
 						?
 					</button>
 					<button class="theme" type="button" onClick={toggleTheme} aria-label={`${theme.value === 'dark' ? 'light' : 'dark'} theme`}>
@@ -163,6 +183,10 @@ export function App() {
 						</dt>
 						<dd>this list</dd>
 					</dl>
+					<label class="switch">
+						<input type="checkbox" checked={keys.value} onChange={(e) => setKeys((e.target as HTMLInputElement).checked)} />
+						single-key shortcuts
+					</label>
 					<form method="dialog">
 						<button class="theme">close</button>
 					</form>
