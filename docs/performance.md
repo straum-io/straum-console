@@ -124,9 +124,9 @@ the idle figure; Linux is expected to drop them at once, not measured.
 A check adds about 22–23 MiB of resident memory to whatever the console
 holds (the 19 MiB of the hash and the runtime around it, from idle to
 peak above): at the history soak's load (23.2 MiB) one sign-in would
-briefly take the console to about 45 MiB, past the 40 MB budget, which
-is written for the steady state (CON-D-9). Sign-ins are not part of the
-soak.
+briefly take the console to about 45 MiB. The budget is 40 MB steady,
+plus at most one check while a sign-in runs (CON-D-9 A), so this is
+within it. Sign-ins are not part of the soak.
 
 ## Other §14 budgets
 
