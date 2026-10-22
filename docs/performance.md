@@ -71,11 +71,13 @@ alone.
 
 ## Per-round cost (`make bench`)
 
-`make bench` on 2026-10-22, at revision `26ad88a` with straum-cli at
-`985ddfe` (straum-cli#21): 10 runs each, medians, in 5 rounds alternating
-with the same benchmarks against the previous straum-cli (`553a5c1`). The
-machine was not idle (load average 2.5–5.3 during the run), so every
-result here is environment-dependent as well as preliminary.
+`make bench`'s benchmarks on 2026-10-22, at revision `26ad88a` with
+straum-cli at `985ddfe` (straum-cli#21), against a test binary built with
+the previous straum-cli (`553a5c1`): the two binaries run alternately,
+`-test.count 2` each, for 5 rounds (10 runs each), medians. Go 1.26.5
+darwin/arm64, on battery. The machine was not idle (load average 2.5–5.3
+during the run), so every result here is environment-dependent as well as
+preliminary.
 
 | Benchmark | Median | Spread (max − min) | Memory per op | Class |
 |---|---|---|---|---|
@@ -86,8 +88,11 @@ result here is environment-dependent as well as preliminary.
 
 Against the previous straum-cli in the same rounds, `Collect` went from
 873 µs to 556 µs (−36 %), 548.5 KiB to 260.1 KiB (−53 %) and 2,761 to
-1,457 allocations (−47 %); the other three, whose code did not change,
-moved by at most 4 %, inside this machine's noise. The first run of this
+1,457 allocations (−47 %). The other three run code that did not change;
+benchstat still called a round of 5 nodes (+2.7 %) and of 15 (+4.2 %)
+slower, and the publishing benchmark unchanged. Those two shifts are put
+down to the machine's load, which rose during the run, not measured as
+such. The first run of this
 table (2026-10-21, a load average of 6–8) had other medians: numbers from
 different days are not comparable here.
 
