@@ -11,11 +11,16 @@ are read-only. The console sends nothing to a node except
 | `GET /api/v1/state` | The latest state; 503 until the first round has closed. |
 | `GET /api/v1/stream` | Server-sent events: `event: state` carries a state after every poll round, `event: event` carries one event with `id:` set to `<epoch>/<id>`, and `event: gap` says events were missed. |
 | `GET /api/v1/history?series=<name>[,<name>…]&node=<id>&range=15m\|1h&since=<ms>` | `{"histories": [...]}`: one history document per series named (at most 14), over the last 15 minutes (default) or hour, for every node or one (see History); with `since`, only the rounds whose `t` is after it. 400 for an unknown series, node or range, more than 14 names, or a `since` that is not Unix milliseconds; 503 before the collector starts. |
+| `GET /api/v1/session` | `{"schema_version": 1, "user": "alice"}`: who is signed in; `"user": null` when the console asks no sign-in. 401 without a live session. |
+| `POST /login` | A form with `user` and `password`. 204 and a session cookie (`straum_console_session`: `HttpOnly`, `Secure`, `SameSite=Strict`, 12 h); 401 for a wrong pair; 429 past 10 attempts a minute from one address (an IPv6 /64) or with 64 sign-ins in line; 403 from another origin. Only with a password file. |
+| `POST /logout` | Ends the session; 204. Only with a password file. |
 | `GET /api/v1/events?after=<id>&limit=<n>` | `{"events": [...]}`: the events of the current epoch after `id` (default 0), oldest first, at most `limit` (1 to 2000, default 2000). If some were evicted, the first id returned is larger than `after` + 1. Ids restart with each epoch: a client that keeps `after` across a console restart compares `epoch`. |
 
-Every endpoint answers 421 to a request whose `Host` is not `localhost` or
-a loopback address, so a web page cannot reach the API through a name it
-points at 127.0.0.1. Anything but GET and HEAD gets 405. `nodes[].error`
+Every endpoint answers 421 to a request whose `Host` is not `localhost`, a
+loopback address or a `--public-host` name, so a web page cannot reach the
+API through a name it points at the console. With a password file every
+`/api/v1` endpoint but the session answers 401 without a live session.
+Anything but GET and HEAD gets 405, except the two posts above. `nodes[].error`
 is at most 256 bytes, cut with `…`: it can quote a node's own output.
 
 Every time is RFC 3339 in UTC, as Go writes it: up to nanoseconds, with

@@ -39,6 +39,13 @@ their own schema version (`docs/state-json.md`).
   Durability (not yet synced, not yet committed), with a 15 min / 1 h
   range.
 - At most 15 nodes; more is a startup error.
+- Sign-in beyond loopback (CON-D-8): `--tls-cert`, `--tls-key`,
+  `--password-file` (the broker's `user:hash` format and argon2id
+  parameters) and `--public-host`, all needed for a listen address beyond
+  loopback. `POST /login`, `POST /logout`, `GET /api/v1/session`; a
+  12-hour `Secure`, `HttpOnly`, `SameSite=Strict` session; one check at a
+  time, 64 in line, 10 attempts a minute per address. SIGHUP re-reads the
+  password file and the certificate.
 - `--debug-listen`: `net/http/pprof` on a second loopback address, off by
   default.
 - `--version`.

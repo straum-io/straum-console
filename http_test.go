@@ -24,7 +24,7 @@ func freeAddr(t *testing.T) string {
 
 func serveHub(t *testing.T, h *hub) string {
 	t.Helper()
-	srv := httptest.NewServer(routes(h))
+	srv := httptest.NewServer(routes(h, nil, nil))
 	t.Cleanup(func() { h.close(); srv.Close() })
 	return srv.URL
 }

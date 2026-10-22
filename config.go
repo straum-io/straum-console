@@ -21,7 +21,13 @@ type config struct {
 	listen   string
 	// debugListen serves net/http/pprof when set: loopback only, off by default.
 	debugListen string
-	version     bool
+	// Beyond loopback (CON-D-8): TLS, a password file and the host names
+	// the Host check accepts. TLS alone is allowed on loopback; the password
+	// file needs TLS, so the session cookie is always Secure.
+	tlsCert, tlsKey string
+	passwordFile    string
+	publicHosts     []string
+	version         bool
 }
 
 // node is one configured metrics endpoint and the id it is expected to
@@ -36,6 +42,10 @@ const (
 	envInterval = "STRAUM_CONSOLE_INTERVAL_MS"
 	envListen   = "STRAUM_CONSOLE_LISTEN"
 	envDebug    = "STRAUM_CONSOLE_DEBUG_LISTEN"
+	envTLSCert  = "STRAUM_CONSOLE_TLS_CERT"
+	envTLSKey   = "STRAUM_CONSOLE_TLS_KEY"
+	envPassword = "STRAUM_CONSOLE_PASSWORD_FILE"
+	envPublic   = "STRAUM_CONSOLE_PUBLIC_HOSTS"
 
 	defaultListen = "127.0.0.1:8080"
 	maxNodes      = 15
@@ -61,7 +71,9 @@ func parseConfig(args, environ []string, stderr io.Writer) (config, error) {
 		if !strings.HasPrefix(k, "STRAUM_CONSOLE_") {
 			continue
 		}
-		if k != envNodes && k != envInterval && k != envListen && k != envDebug {
+		switch k {
+		case envNodes, envInterval, envListen, envDebug, envTLSCert, envTLSKey, envPassword, envPublic:
+		default:
 			return config{}, fmt.Errorf("unknown variable %s", k)
 		}
 		env[k] = v
@@ -72,8 +84,12 @@ func parseConfig(args, environ []string, stderr io.Writer) (config, error) {
 	var nodes nodeFlag
 	fs.Var(&nodes, "node", "a node as id=host:port, its metrics address (repeatable or comma-separated; else "+envNodes+")")
 	interval := fs.Duration("interval", defaultInterval, "time between polls, 1s to 1m (else "+envInterval+")")
-	listen := fs.String("listen", defaultListen, "where to serve /api/v1, a loopback address only (else "+envListen+")")
+	listen := fs.String("listen", defaultListen, "where to serve /api/v1: a loopback address, or beyond loopback with TLS, a password file and public hosts (else "+envListen+")")
 	debugListen := fs.String("debug-listen", "", "where to serve net/http/pprof, a loopback address only; off when empty (else "+envDebug+")")
+	tlsCert := fs.String("tls-cert", "", "a PEM certificate chain: serve HTTPS (with --tls-key; else "+envTLSCert+")")
+	tlsKey := fs.String("tls-key", "", "the PEM private key of --tls-cert (else "+envTLSKey+")")
+	passwordFile := fs.String("password-file", "", "user:hash lines as straum-server hash-password prints them: sign-in required; needs TLS (else "+envPassword+")")
+	publicHosts := fs.String("public-host", "", "host names, comma-separated, that browsers use to reach the console beyond loopback; needs TLS and a password file (else "+envPublic+")")
 	version := fs.Bool("version", false, "print the version and exit")
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
@@ -116,19 +132,39 @@ func parseConfig(args, environ []string, stderr io.Writer) (config, error) {
 		return config{}, fmt.Errorf("interval %s: want 1s to 1m", cfg.interval)
 	}
 
-	cfg.listen = *listen
-	if v, ok := env[envListen]; ok && !set["listen"] {
-		cfg.listen = v
+	pick := func(flagValue, name, envName string) string {
+		if v, ok := env[envName]; ok && !set[name] {
+			return v
+		}
+		return flagValue
 	}
-	if err := checkListen(cfg.listen); err != nil {
+	cfg.listen = pick(*listen, "listen", envListen)
+	cfg.debugListen = pick(*debugListen, "debug-listen", envDebug)
+	cfg.tlsCert = pick(*tlsCert, "tls-cert", envTLSCert)
+	cfg.tlsKey = pick(*tlsKey, "tls-key", envTLSKey)
+	cfg.passwordFile = pick(*passwordFile, "password-file", envPassword)
+	for _, h := range strings.Split(pick(*publicHosts, "public-host", envPublic), ",") {
+		if h = strings.TrimSpace(h); h != "" {
+			if strings.ContainsAny(h, ":/[] ") {
+				return config{}, fmt.Errorf("public host %q: want a host name, without port or scheme", h)
+			}
+			cfg.publicHosts = append(cfg.publicHosts, h)
+		}
+	}
+	tls := cfg.tlsCert != "" || cfg.tlsKey != ""
+	switch {
+	case (cfg.tlsCert == "") != (cfg.tlsKey == ""):
+		return config{}, errors.New("--tls-cert and --tls-key go together")
+	case cfg.passwordFile != "" && !tls:
+		return config{}, errors.New("--password-file needs --tls-cert and --tls-key: a password and its session must not cross the network in clear")
+	case len(cfg.publicHosts) > 0 && cfg.passwordFile == "":
+		return config{}, errors.New("--public-host needs --password-file and TLS: beyond loopback the console requires sign-in")
+	}
+	if err := checkListen(cfg.listen, len(cfg.publicHosts) > 0); err != nil {
 		return config{}, err
 	}
-	cfg.debugListen = *debugListen
-	if v, ok := env[envDebug]; ok && !set["debug-listen"] {
-		cfg.debugListen = v
-	}
 	if cfg.debugListen != "" {
-		if err := checkListen(cfg.debugListen); err != nil {
+		if err := checkListen(cfg.debugListen, false); err != nil {
 			return config{}, fmt.Errorf("debug %w", err)
 		}
 	}

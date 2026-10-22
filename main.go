@@ -1,10 +1,11 @@
 // straum-console is a read-only web console for a Straum cluster. It polls
-// the nodes' metrics endpoints and serves the /api/v1 of docs/state-json.md
-// on loopback.
+// the nodes' metrics endpoints and serves the /api/v1 of docs/state-json.md,
+// on loopback, or beyond it with TLS and sign-in (CON-D-8).
 package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -30,6 +32,22 @@ func main() {
 	defer stop()
 	os.Exit(run(ctx, os.Args[1:], os.Environ(), os.Stdout, os.Stderr, nil))
 }
+
+// certificate is the served TLS certificate, replaced whole on reload.
+type certificate struct {
+	p atomic.Pointer[tls.Certificate]
+}
+
+func (c *certificate) load(certFile, keyFile string) error {
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return fmt.Errorf("TLS: %w", err)
+	}
+	c.p.Store(&cert)
+	return nil
+}
+
+func (c *certificate) get(*tls.ClientHelloInfo) (*tls.Certificate, error) { return c.p.Load(), nil }
 
 // run serves until ctx ends. ready, if not nil, gets the address listened
 // on once the listener is open.
@@ -47,16 +65,58 @@ func run(ctx context.Context, args, environ []string, stdout, stderr io.Writer, 
 		return 0
 	}
 	log := slog.New(slog.NewJSONHandler(stderr, nil))
+	var a *auth
+	if cfg.passwordFile != "" {
+		if a, err = newAuth(cfg.passwordFile); err != nil {
+			fmt.Fprintln(stderr, "straum-console:", err)
+			return 2
+		}
+	}
+	var cert certificate
+	if cfg.tlsCert != "" {
+		if err := cert.load(cfg.tlsCert, cfg.tlsKey); err != nil {
+			fmt.Fprintln(stderr, "straum-console:", err)
+			return 2
+		}
+	}
 	ln, err := net.Listen("tcp", cfg.listen)
 	if err != nil {
 		fmt.Fprintln(stderr, "straum-console:", err)
 		return 1
 	}
 	c := newCollector(cfg, log)
-	srv := newServer(c.hub)
+	srv := newServer(c.hub, a, cfg.publicHosts)
 	served := make(chan error, 1)
-	go func() { served <- srv.Serve(ln) }()
-	log.Info("serving", "version", version, "listen", ln.Addr().String(), "nodes", len(cfg.nodes), "interval", cfg.interval.String())
+	if cfg.tlsCert != "" {
+		srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: cert.get}
+		go func() { served <- srv.ServeTLS(ln, "", "") }()
+	} else {
+		go func() { served <- srv.Serve(ln) }()
+	}
+	// SIGHUP re-reads the password file and the certificate; a file that
+	// does not load leaves the old one in place.
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	defer signal.Stop(hup)
+	go func() {
+		for range hup {
+			if a != nil {
+				if err := a.reload(); err != nil {
+					log.Error("reload kept the old password file", "error", err)
+				} else {
+					log.Info("password file reloaded")
+				}
+			}
+			if cfg.tlsCert != "" {
+				if err := cert.load(cfg.tlsCert, cfg.tlsKey); err != nil {
+					log.Error("reload kept the old certificate", "error", err)
+				} else {
+					log.Info("certificate reloaded")
+				}
+			}
+		}
+	}()
+	log.Info("serving", "version", version, "listen", ln.Addr().String(), "tls", cfg.tlsCert != "", "sign_in", a != nil, "nodes", len(cfg.nodes), "interval", cfg.interval.String())
 	if cfg.debugListen != "" {
 		dln, err := net.Listen("tcp", cfg.debugListen)
 		if err != nil {

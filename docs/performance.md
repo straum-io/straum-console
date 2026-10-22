@@ -101,11 +101,36 @@ about 0.03 % of a core for that work alone. What the rest of the soak's
 0.40 % is spent on (the Go runtime, the HTTP server, the 64 streams) is not
 measured.
 
+## Sign-in (CON-D-8)
+
+The console binary with TLS and a password file on loopback, one fixture
+node, `curl` signing in; resident memory by `ps` every 50 ms, the heap by
+`/debug/pprof/heap`. 2026-10-22, macOS, on battery.
+
+| | Resident memory |
+|---|---|
+| Idle, sign-in on | 14.3–15.2 MiB |
+| During one check (argon2id, m = 19 MiB) | 37.6 MiB at most |
+| After 5 sign-ins, then 64 at once from one address (5 more hashed, 59 refused by the rate limit) | 42.1 MiB; heap in use 3.3 MB, 28.4 MB released to the OS |
+| 20 s later | 36.3 MiB |
+
+The first build kept each check's 19 MiB: 56 MiB after five sign-ins and
+80 MiB after the burst, staying there. Each check now returns its memory
+before the next may start (`debug.FreeOSMemory`); the heap figures above
+show it released. macOS keeps released pages in a process's resident
+size until it needs them back, which is why the last two rows stay above
+the idle figure; Linux is expected to drop them at once, not measured.
+
+A check adds its 19 MiB to whatever the console holds: at the history
+soak's load (23.2 MiB) one sign-in would briefly take the console to
+about 42 MiB, past the 40 MB budget, which is written for the steady
+state. Sign-ins are not part of the soak.
+
 ## Other §14 budgets
 
 | Budget | Target | Measured | |
 |---|---|---|---|
-| Frontend bundle | ≤ 60 KB gzip JS + CSS | 19,501 B (`make web-size`, CI) | met |
+| Frontend bundle | ≤ 60 KB gzip JS + CSS | 20,259 B (`make web-size`, CI) | met |
 | SSE per round | ≤ 4 KiB per client at 5 nodes | 1,976 B (`TestStreamRoundSize`) | met |
 | Nodes supported | 3–15 | 15 fixture nodes observed in one round (`TestFifteenNodes`); 3 real nodes (`make e2e`) | met |
 | Event payload | ≤ 1 KiB | node error text capped at 256 B where it enters the state | met by construction |
